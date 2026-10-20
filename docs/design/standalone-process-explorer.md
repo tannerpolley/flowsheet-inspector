@@ -128,6 +128,51 @@ Routes:
 
 Every run also appends to `reportdb`, so the VS Code history tab sees browser runs.
 
+#### Webview message protocol (owner: inspector pull request 4)
+
+The browser host (`webview_ui/src/host.ts`) carries the same messages the VS Code webview
+exchanges with the extension, unchanged in shape. It needs one route beyond the table above:
+
+| Method | Path | Does |
+|---|---|---|
+| POST | `/api/message` | One UI-to-host message as the JSON body; token in the `X-FI-Token` header. Any 2xx is success; replies arrive on `/api/events` |
+
+- `/api/events` (above) is the host-to-UI stream: each server-sent event's `data` is one JSON message. `EventSource` cannot set headers, so the token is the `token` query parameter.
+- Both routes resolve relative to the page URL, so the UI served at `/?token=…` calls `/api/message` and `/api/events?token=…`.
+- A failed POST (network error or non-2xx) shows up in the UI as an `error` message.
+- The browser build is `npm run build -- --mode browser` in `webview_ui`. It writes `webview_ui/dist-browser/` with relative asset paths. The lib serves that directory.
+
+UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webView`). The browser host must support the first group; the second is VS Code-only, and `fi-serve` may ignore those or answer with an `error` message.
+
+| Instruction | Fields | Expected reply |
+|---|---|---|
+| `ready` | — | `init` (with `loadApp`), then current `switch_tab`, `flowsheet_runner_result`, `step_status_update` |
+| `run_flowsheet` | `selectedSteps`: last step name to run | `start_new_run`, `clear_terminal_logs`, `process_started`, `terminal_log`…, `step_status_update`…, `flowsheet_runner_result`, final `step_status_update` (`final: true`), `run_flowsheet_done` |
+| `kill_process` | `pid` (from `process_started`) | `terminal_log`, `run_flowsheet_done` |
+| `pull_flowsheet_history` | `id`: reportdb run id | `flowsheet_runner_result`, `step_status_update` (`reset: true`), or `error` |
+| `switch_sub_tab` | `tab_name`, `sub_tab_name` | the same `switch_sub_tab` broadcast back |
+| VS Code-only: `focus_view`, `focus_document` (`target`, `line`), `open_interpreter_picker`, `post_github_issue` (reply `github_issue_result`) | | |
+
+The UI also posts bare acknowledgements `{reload_mermaid: "done"}` and `{reload_webview: "done"}` with no `frontendInstruction`; the host may ignore them.
+
+Host to UI (`type`):
+
+| `type` | Fields | Effect |
+|---|---|---|
+| `init` | `loadApp` (`treeView` or `webView`), `fileName`, `content`, `idaesRunInfo`, `osPlatform` | Chooses the page and ends loading |
+| `switch_tab` | `activate_tab_name`, `is_flowsheet`, `isLoading`, `idaesRunInfo`, `initError`, `packageWarnings`, `open_python_files` | Active flowsheet and its steps |
+| `flowsheet_runner_result` | `data`: one report (reportdb schema) | All result panels |
+| `step_status_update` | `data`: step rows (`step_name`, `errcode`, `solve_ok`, `errmsg`), `runException`, `final`, `reset` | Step icons and error log |
+| `start_new_run`, `clear_terminal_logs`, `run_flowsheet_done` | — | Run lifecycle |
+| `process_started` | `pid` | Enables cancel |
+| `terminal_log` | `data`: text chunk | Terminal log tab |
+| `error` | `message` | Error log |
+| `history_update` | `data`: run list | History tab |
+| `switch_sub_tab` | `tab_name`, `sub_tab_name` | Result tab selection |
+| VS Code-only: `python_env_update`, `update_open_files`, `flowsheet_file_saved`, `highlight_view`, `github_issue_result` | | |
+
+The UI still handles `update` and `flowsheet_detail`, but the extension no longer sends them; the browser host need not either.
+
 ### 5.3 How a flowsheet declares what to show and what is editable
 
 Use what IDAES already has; add as little as possible.

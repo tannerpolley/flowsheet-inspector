@@ -25,10 +25,13 @@ function cleanDir(dir: string) {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+// `vite build --mode browser` emits standalone assets for the browser host
+// (served by fi-serve) into dist-browser/ and leaves the extension copy alone.
+export default defineConfig(({ mode }) => ({
+  ...(mode === 'browser' && { base: './' }),
   plugins: [
     react(),
-    {
+    mode !== 'browser' && {
       name: 'copy-to-extension',
       closeBundle() {
         const src = './dist'
@@ -44,10 +47,11 @@ export default defineConfig({
     }
   ],
   build: {
+    ...(mode === 'browser' && { outDir: 'dist-browser' }),
     rollupOptions: {
       output: {
         inlineDynamicImports: true,
       }
     }
   }
-})
+}))

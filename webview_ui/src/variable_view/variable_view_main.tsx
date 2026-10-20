@@ -1,5 +1,6 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../context"
+import { host } from "../host";
 import FlowsheetVariableDisplay from "./flowsheet_variable_display";
 import css from "../css/webview_page.module.css";
 import { postReloadMermaidDone } from '../util/post_message';
@@ -8,8 +9,7 @@ export default function VariableView() {
     const { setFlowsheetRunnerResult, activateFileName } = useContext(AppContext);
 
     useEffect(() => {
-        window.addEventListener('message', (event) => {
-            const message = event.data;
+        host.onMessage((message) => {
             if (message.type === 'flowsheet_runner_result') {
                 console.log(`receive flowsheet runner result! now updating flowsheetRunnerResult state`);
                 setFlowsheetRunnerResult(message.data);

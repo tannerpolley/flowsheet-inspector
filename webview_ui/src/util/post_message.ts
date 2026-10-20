@@ -1,7 +1,7 @@
-import { vscode } from '../vscode'
+import { host } from '../host'
 /**
  * @Desctription to post a read message to tell extension mermaid is realoaded. Once extension received webview and mermaid reload done message it will tell tree panel run flowsheet is finished.
  */
 export function postReloadMermaidDone(message: { [key: string]: string }) {
-    vscode.postMessage(message)
+    host.postMessage(message)
 }
