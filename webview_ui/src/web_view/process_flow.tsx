@@ -98,6 +98,9 @@ function Flow({ graph, streamTable, onShowStream }: {
     // The saved layout arrived after the first fitView, so fit again once it is drawn.
     const fitAfterLayout = useRef(false);
     const [fitRequest, setFitRequest] = useState(0);
+    // Only the latest layout calculation may draw; a drag starts a new generation,
+    // so a calculation still running from an earlier saved layout cannot undo it.
+    const generation = useRef(0);
 
     // Ask once for this report's saved positions (the view remounts per report).
     useEffect(() => {
@@ -112,9 +115,9 @@ function Flow({ graph, streamTable, onShowStream }: {
     }, []);
 
     useEffect(() => {
-        let current = true;
+        const current = ++generation.current;
         layoutFlowsheet(graph, saved).then((result) => {
-            if (!current) return;
+            if (current !== generation.current) return;
             setNodes(result.nodes);
             setEdges(result.edges);
             setError(result.error);
@@ -123,7 +126,7 @@ function Flow({ graph, streamTable, onShowStream }: {
                 setFitRequest((n) => n + 1);
             }
         });
-        return () => { current = false; };
+        return () => { generation.current++; };
     }, [graph, saved, setNodes]);
 
     // Fit after the new positions reach React Flow; fitView measures its current nodes.
@@ -183,7 +186,11 @@ function Flow({ graph, streamTable, onShowStream }: {
                     edges={edges}
                     nodeTypes={nodeTypes}
                     onNodesChange={onNodesChange}
-                    onNodeDragStart={() => { edited.current = true; }}
+                    onNodeDragStart={() => {
+                        edited.current = true;
+                        fitAfterLayout.current = false;
+                        generation.current++;
+                    }}
                     onNodeDragStop={(_event, _node, dragged) => saveLayout({
                         ...saved,
                         ...Object.fromEntries(dragged.map((node) => [node.id, node.position])),
