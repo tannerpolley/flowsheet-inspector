@@ -1,5 +1,6 @@
 import { useState, useContext, useEffect, useRef } from "react";
 import { AppContext } from "../context";
+import { host, type HostMessage } from "../host";
 import Mermaid from "./meraid";
 import Ipopt from "./ipopt";
 import Diagnostic from "./diagnostic";
@@ -17,8 +18,7 @@ export default function WebView() {
     const totalDof = flowsheetRunnerResult?.actions?.degrees_of_freedom?.model;
 
     useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            const message = event.data;
+        const handleMessage = (message: HostMessage) => {
             if (message.type === 'switch_sub_tab' && message.tab_name) {
                 setActiveTab(message.tab_name);
                 if (message.sub_tab_name === 'error' || message.sub_tab_name === 'terminal') {
@@ -26,8 +26,7 @@ export default function WebView() {
                 }
             }
         };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
+        return host.onMessage(handleMessage);
     }, []);
 
     useEffect(() => {

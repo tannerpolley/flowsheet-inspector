@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext, useRef } from "react";
 import type { idaesRunInfo } from "../interface/interface";
 import { AppContext } from "../context";
-import { vscode } from '../vscode';
+import { host } from '../host';
 import TreeNavBar from "./treeviewNav";
 import css from "../css/tree_app.module.css";
 
@@ -55,7 +55,7 @@ export default function FlowsheetSteps({ idaesRunInfo }: { idaesRunInfo: idaesRu
     // const focuseView = useRef<HTMLSelectElement>(null)
 
     const handleOpenView = (target: string) => {
-        vscode.postMessage({
+        host.postMessage({
             frontendInstruction: 'focus_view',
             fromPanel: 'treeView',
             target: target
@@ -65,7 +65,7 @@ export default function FlowsheetSteps({ idaesRunInfo }: { idaesRunInfo: idaesRu
     const handleDocumentSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const targetPath = e.target.value;
         if (targetPath) {
-            vscode.postMessage({
+            host.postMessage({
                 frontendInstruction: 'focus_document',
                 fromPanel: 'treeView',
                 target: targetPath
@@ -80,7 +80,7 @@ export default function FlowsheetSteps({ idaesRunInfo }: { idaesRunInfo: idaesRu
     };
 
     const handleChangeInterpreter = () => {
-        vscode.postMessage({
+        host.postMessage({
             frontendInstruction: 'open_interpreter_picker',
             fromPanel: 'treeView',
         });

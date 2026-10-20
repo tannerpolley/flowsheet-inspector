@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { vscode } from './vscode';
+import { host } from './host';
 import { useContext } from 'react';
 import { AppContext } from './context';
 import type { Diagnostics } from './interface/flowsheet_result_interface';
@@ -90,8 +90,7 @@ export default function App() {
 
   useEffect(() => {
     // listen extension message
-    window.addEventListener('message', (event) => {
-      const message = event.data;
+    host.onMessage((message) => {
       switch (message.type) {
         case 'init':
           console.log(`VSCode post message: ${JSON.stringify(message)}`);
@@ -276,7 +275,7 @@ export default function App() {
     });
 
     // tell extension React is ready, can send data
-    vscode.postMessage({ frontendInstruction: 'ready', fromPanel: 'treeView' });
+    host.postMessage({ frontendInstruction: 'ready', fromPanel: 'treeView' });
   }, []);
 
   return (

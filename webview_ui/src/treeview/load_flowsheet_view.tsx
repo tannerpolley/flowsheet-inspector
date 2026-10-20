@@ -1,7 +1,7 @@
 import { useState, useContext, useMemo } from "react";
 import css from "../css/load_flowsheet_view.module.css";
 import { AppContext } from "../context";
-import { vscode } from "../vscode";
+import { host } from "../host";
 
 // Helper to convert unix timestamp to relative time string
 function timeSince(unixTimestampSeconds: number) {
@@ -51,7 +51,7 @@ export default function LoadFlowsheetView() {
 
     const handleLoadRun = (id?: number) => {
         if (id) {
-            vscode.postMessage({ frontendInstruction: "pull_flowsheet_history", fromPanel: "treeView", id });
+            host.postMessage({ frontendInstruction: "pull_flowsheet_history", fromPanel: "treeView", id });
         }
     };
 

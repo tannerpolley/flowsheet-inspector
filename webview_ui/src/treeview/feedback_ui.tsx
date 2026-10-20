@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { vscode } from "../vscode";
+import { host, type HostMessage } from "../host";
 import css from "../css/tree_app.module.css";
 
 // Options for the category dropdown; the chosen value is prefixed to the
@@ -38,8 +38,7 @@ export default function FeedbackUi({ onClose }: { onClose: () => void }) {
 
     // Listen for the submission outcome broadcast back by the extension host.
     useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            const message = event.data;
+        const handler = (message: HostMessage) => {
             if (message?.type !== "github_issue_result") {
                 return;
             }
@@ -66,8 +65,7 @@ export default function FeedbackUi({ onClose }: { onClose: () => void }) {
                 });
             }
         };
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
+        return host.onMessage(handler);
     }, []);
 
     /**
@@ -83,7 +81,7 @@ export default function FeedbackUi({ onClose }: { onClose: () => void }) {
         }
         setNotice(null);
         setIsSubmitting(true);
-        vscode.postMessage({
+        host.postMessage({
             frontendInstruction: "post_github_issue",
             fromPanel: "treeView",
             subject,

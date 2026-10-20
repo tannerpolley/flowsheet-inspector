@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { vscode } from '../vscode';
+import { host } from '../host';
 import css from '../css/logview.module.css';
 
 /**
@@ -24,7 +24,7 @@ const TRACEBACK_LOCATION_RE = /File "([^"]+)", line (\d+)/g;
  * @param line 1-based line number from the traceback.
  */
 function openFileAtLine(filePath: string, line: number) {
-    vscode.postMessage({
+    host.postMessage({
         frontendInstruction: 'focus_document',
         fromPanel: 'webView',
         target: filePath,

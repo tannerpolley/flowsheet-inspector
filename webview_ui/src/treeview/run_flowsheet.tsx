@@ -1,4 +1,4 @@
-import { vscode } from "../vscode";
+import { host, type HostMessage } from "../host";
 import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../context";
 import css from "../css/run_flowsheet.module.css";
@@ -33,7 +33,7 @@ export default function RunFlowsheet() {
         const lastSelectedStep = selectedSteps.length > 0
             ? selectedSteps[selectedSteps.length - 1]
             : "";
-        vscode.postMessage(
+        host.postMessage(
             {
                 frontendInstruction: "run_flowsheet",
                 fromPanel: 'treeView',
@@ -50,7 +50,7 @@ export default function RunFlowsheet() {
 
     const cancelFlowsheetRunHandler = () => {
         console.log(`cancelFlowsheetRunHandler triggered, activePid is: ${activePid}`);
-        vscode.postMessage(
+        host.postMessage(
             {
                 frontendInstruction: 'kill_process',
                 fromPanel: 'treeView',
@@ -64,8 +64,7 @@ export default function RunFlowsheet() {
     }
 
     useEffect(() => {
-        const messageHandler = (event: MessageEvent) => {
-            const message = event.data;
+        const messageHandler = (message: HostMessage) => {
             switch (message.type) {
                 case 'process_started':
                     console.log(`Received process_started message in frontend! PID is: ${message.pid}`);
@@ -82,8 +81,7 @@ export default function RunFlowsheet() {
                     break;
             }
         };
-        window.addEventListener('message', messageHandler);
-        return () => window.removeEventListener('message', messageHandler);
+        return host.onMessage(messageHandler);
     }, [setFlowsheetRunnerResult, setIsRunningFlowsheet]);
 
     // Timer and animated dots logic

@@ -1,5 +1,6 @@
 import { useEffect, useContext } from 'react';
 import { AppContext } from '../context';
+import { host, type HostMessage } from '../host';
 import css from '../css/logview.module.css';
 import ErrorLog from './error_log';
 import TerminalLogs from './terminal_log';
@@ -8,16 +9,14 @@ export default function LogsView() {
     const { activeLogTab, setActiveLogTab } = useContext(AppContext);
 
     useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            const message = event.data;
+        const handleMessage = (message: HostMessage) => {
             if (message.type === 'switch_sub_tab' && message.sub_tab_name) {
                 if (message.sub_tab_name === 'error' || message.sub_tab_name === 'terminal') {
                     setActiveLogTab(message.sub_tab_name);
                 }
             }
         };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
+        return host.onMessage(handleMessage);
     }, []);
 
     return (

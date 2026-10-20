@@ -1,14 +1,14 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../context";
+import { host } from "../host";
 import FlowsheetSteps from "./flowsheet_steps";
 
 export default function RunFlowsheetView() {
     const { idaesRunInfo, setIsRunningFlowsheet } = useContext(AppContext);
 
     useEffect(() => {
-        window.addEventListener('message', (e) => {
-            const message = e.data;
-            console.log(e.data)
+        host.onMessage((message) => {
+            console.log(message)
             switch (message.type) {
                 case 'run_flowsheet_done':
                     setIsRunningFlowsheet(false);
