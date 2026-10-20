@@ -223,7 +223,7 @@ def build(ctx):
   - a "collapse block" option to show a sub-block as one unit.
 - **View (inspector):**
   - React Flow (MIT) with elkjs (EPL-2.0) layered layout, left to right, using port sides from the icon registry;
-  - drag to reposition and save to `/api/layout`;
+  - drag to reposition; positions are saved per flowsheet through the `load_layout` / `save_layout` / `layout` messages in 5.2 (the UI does not call `/api/layout`);
   - hover a link to see stream values, and click to highlight its stream-table column;
   - export SVG/PNG.
   - hover values and click-highlight use the arc's `stream_column` when present, else its `name`; without `stream_column`, multi-index arcs find no stream-table column;
