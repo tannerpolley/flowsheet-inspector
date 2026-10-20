@@ -36,8 +36,12 @@ test('uses HTTP plus server-sent events in a plain browser', async () => {
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('window', { location: { href: 'http://127.0.0.1:8765/?token=s3cret' } });
     const { host } = await import('./host');
+    // The stream opens only once something listens, so its first snapshot is never dropped.
+    expect(sources).toHaveLength(0);
     const received = vi.fn();
     host.onMessage(received);
+    host.onMessage(vi.fn());
+    expect(sources).toHaveLength(1);
 
     const [source] = sources;
     expect(source.url).toBe('http://127.0.0.1:8765/api/events?token=s3cret');
@@ -71,14 +75,4 @@ test('uses HTTP plus server-sent events in a plain browser', async () => {
     source.readyState = 2;
     source.onerror!();
     expect(received).toHaveBeenCalledWith({ type: 'error', message: 'Lost connection to fi-serve event stream (/api/events)' });
-
-    // With the stream closed for good nothing could reply, so a run fails locally.
-    received.mockClear();
-    fetchMock.mockClear();
-    host.postMessage(message);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(received.mock.calls).toEqual([
-        [{ type: 'error', message: 'Request to fi-serve failed: event stream closed' }],
-        [{ type: 'run_flowsheet_done' }],
-    ]);
 });

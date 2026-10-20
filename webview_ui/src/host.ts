@@ -42,41 +42,32 @@ function httpHost(pageUrl: string): Host {
     const listeners = new Set<Listener>();
     const dispatch = (message: HostMessage) => listeners.forEach((listener) => listener(message));
 
+    // Opened on the first subscription rather than at import, so fi-serve's
+    // connection snapshot cannot arrive before anything is listening.
     // EventSource cannot send headers, so the token rides in the query string.
-    const eventsUrl = new URL('api/events', page);
-    eventsUrl.searchParams.set('token', token);
-    const events = new EventSource(eventsUrl);
-    events.onmessage = (event) => {
-        try {
-            dispatch(JSON.parse(event.data));
-        } catch {
-            dispatch({ type: 'error', message: `Unreadable message from fi-serve: ${event.data}` });
-        }
-    };
-    // CONNECTING means the browser is retrying on its own; CLOSED is final.
-    events.onerror = () => {
-        if (events.readyState === EventSource.CLOSED) {
-            dispatch({ type: 'error', message: `Lost connection to fi-serve event stream (${eventsUrl.pathname})` });
-        }
-    };
-
-    // Report a failed request as the extension does: an error, and a rejected
-    // run ends so the Run button comes back.
-    const fail = (message: HostMessage, reason: unknown) => {
-        dispatch({ type: 'error', message: `Request to fi-serve failed: ${reason}` });
-        if (message?.frontendInstruction === 'run_flowsheet') dispatch({ type: 'run_flowsheet_done' });
+    let events: EventSource | undefined;
+    const openEvents = () => {
+        const eventsUrl = new URL('api/events', page);
+        eventsUrl.searchParams.set('token', token);
+        const source = new EventSource(eventsUrl);
+        source.onmessage = (event) => {
+            try {
+                dispatch(JSON.parse(event.data));
+            } catch {
+                dispatch({ type: 'error', message: `Unreadable message from fi-serve: ${event.data}` });
+            }
+        };
+        // CONNECTING means the browser is retrying on its own; CLOSED is final.
+        source.onerror = () => {
+            if (source.readyState === EventSource.CLOSED) {
+                dispatch({ type: 'error', message: `Lost connection to fi-serve event stream (${eventsUrl.pathname})` });
+            }
+        };
+        return source;
     };
 
     return {
-        postMessage(message) {
-            // Replies travel on the event stream; once it is closed for good
-            // nothing could answer, so fail locally instead of sending.
-            if (events.readyState === EventSource.CLOSED) {
-                fail(message, 'event stream closed');
-                return;
-            }
-            // A request sent while the stream reconnects needs no queue: fi-serve
-            // sends a state snapshot on every connection (design doc 5.2).
+        postMessage(message: HostMessage) {
             fetch(new URL('api/message', page), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-FI-Token': token },
@@ -85,10 +76,16 @@ function httpHost(pageUrl: string): Host {
                 .then((response) => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 })
-                .catch((error) => fail(message, error));
+                // Report it as the extension does: an error, and a rejected run
+                // ends so the Run button comes back.
+                .catch((error) => {
+                    dispatch({ type: 'error', message: `Request to fi-serve failed: ${error}` });
+                    if (message?.frontendInstruction === 'run_flowsheet') dispatch({ type: 'run_flowsheet_done' });
+                });
         },
         onMessage(listener) {
             listeners.add(listener);
+            events ??= openEvents();
             return () => { listeners.delete(listener); };
         },
     };
