@@ -33,6 +33,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode !== 'browser' && {
       name: 'copy-to-extension',
+      apply: 'build',
       closeBundle() {
         const src = './dist'
         const dest = '../extension/src/webview_template/webview_new'

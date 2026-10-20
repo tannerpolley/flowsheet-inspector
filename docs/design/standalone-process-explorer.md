@@ -135,11 +135,12 @@ exchanges with the extension, unchanged in shape. It needs one route beyond the 
 
 | Method | Path | Does |
 |---|---|---|
-| POST | `/api/message` | One UI-to-host message as the JSON body; token in the `X-FI-Token` header. Any 2xx is success; replies arrive on `/api/events` |
+| POST | `/api/message` | One UI-to-host message as the JSON body; token in the `X-FI-Token` header. Answer promptly with any 2xx once accepted (a run continues in the background); replies arrive on `/api/events` |
 
 - `/api/events` (above) is the host-to-UI stream: each server-sent event's `data` is one JSON message. `EventSource` cannot set headers, so the token is the `token` query parameter.
 - Both routes resolve relative to the page URL, so the UI served at `/?token=…` calls `/api/message` and `/api/events?token=…`.
-- A failed POST (network error or non-2xx) shows up in the UI as an `error` message.
+- The UI holds its POSTs until the event stream is open, so a reply such as `init` cannot be broadcast before the UI listens.
+- A failed POST (network error or non-2xx) shows up in the UI as an `error` message; for `run_flowsheet` the UI also ends the run locally, as if `run_flowsheet_done` had arrived. Unparseable event data and a closed event stream also show up as `error`.
 - The browser build is `npm run build -- --mode browser` in `webview_ui`. It writes `webview_ui/dist-browser/` with relative asset paths. The lib serves that directory.
 - The UI reaches `fi-serve` only through these two routes, so one message protocol serves both hosts. Later inspector units (diagram layout, inputs and re-solve, costing, scenarios) append their message types to the tables below. The other REST routes in the table above remain the lib's choice for scripts and tests; the UI does not call them.
 
@@ -147,9 +148,9 @@ UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webVi
 
 | Instruction | Fields | Expected reply |
 |---|---|---|
-| `ready` | — | `init` (with `loadApp`), then current `switch_tab`, `flowsheet_runner_result`, `step_status_update` |
-| `run_flowsheet` | `selectedSteps`: last step name to run | `start_new_run`, `clear_terminal_logs`, `process_started`, `terminal_log`…, `step_status_update`…, `flowsheet_runner_result`, final `step_status_update` (`final: true`), `run_flowsheet_done` |
-| `kill_process` | `pid` (from `process_started`) | `terminal_log`, `run_flowsheet_done` |
+| `ready` | — | Extension: the tree view gets `init` (`loadApp: "treeView"`) then `switch_tab` (steps in `idaesRunInfo`); the results panel gets only `init` (`loadApp: "webView"`). Browser host: `init`, `switch_tab`, then, because `fi-serve` holds a report in memory, that report as `flowsheet_runner_result` (browser-only behaviour) |
+| `run_flowsheet` | `selectedSteps`: last step name to run | Success: `start_new_run`, `clear_terminal_logs`, `process_started`, `terminal_log`…, `step_status_update`…, final `step_status_update` (`final: true`, `runException`), `flowsheet_runner_result`, `run_flowsheet_done`. Failure: if the process started, the same messages up to the final `step_status_update`; then `error` and `run_flowsheet_done`, with no report |
+| `kill_process` | `pid` (from `process_started`) | `terminal_log` (stopped manually), final `step_status_update`, `run_flowsheet_done`; no report |
 | `pull_flowsheet_history` | `id`: reportdb run id | `flowsheet_runner_result`, `step_status_update` (`reset: true`), or `error` |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | the same `switch_sub_tab` broadcast back |
 | VS Code-only: `focus_view`, `focus_document` (`target`, `line`), `open_interpreter_picker`, `post_github_issue` (reply `github_issue_result`) | | |
