@@ -12,6 +12,7 @@ import openWebView from '../web_view/web_view_panel';
 import { queryLatestReport, queryStatusTableExists } from './sqlite_reader';
 import runTerminalCommand from './run_terminal_command';
 import { getActivePythonEnv, activatedProcessEnv } from './python_env';
+import { setDisplayedFlowsheet } from './flowsheet_layout';
 import { getMaxReportId, startStepStatusPolling, stopStepStatusPolling, broadcastFinalStepStatus } from './step_status_polling';
 
 const NO_INTERPRETER_MSG =
@@ -124,6 +125,7 @@ export default async function runFlowsheet(
                 throw new Error('No report found in database');
             }
             console.log('Successfully loaded report from SQLite. Broadcasting to webviews...');
+            setDisplayedFlowsheet(activateFileName);
             brodcastMessage({ type: 'flowsheet_runner_result', data: reportData });
         } catch (dbErr: any) {
             console.warn(`Could not load report from SQLite (non-fatal): ${dbErr.message}`);

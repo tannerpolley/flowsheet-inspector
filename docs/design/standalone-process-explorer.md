@@ -156,6 +156,8 @@ UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webVi
 | `kill_process` | `pid` (from `process_started`) | `terminal_log` (stopped manually), a final `step_status_update` if any step was recorded, then `run_flowsheet_done`; no report |
 | `pull_flowsheet_history` | `id`: reportdb run id | `flowsheet_runner_result`, `step_status_update` (`reset: true`), or `error` |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | the same `switch_sub_tab` broadcast back |
+| `load_layout` | `request`: client-chosen id, echoed in the reply | `layout`, or `error` if the stored file is invalid (the UI keeps the automatic layout) |
+| `save_layout` | `positions`: `{<unit name>: {x, y}}` with finite numbers, the whole saved map (replaces the stored one; `{}` resets) | none, or `error` without touching the stored file if `positions` is invalid. Both layout messages use the flowsheet of the displayed report, never a path from the UI: in VS Code the file last run or the history run's file, in `fi-serve` its single served flowsheet; stored next to it as `<flowsheet stem>.fi-layout.json` |
 | VS Code-only: `focus_view`, `focus_document` (`target`, `line`), `open_interpreter_picker`, `post_github_issue` (reply `github_issue_result`) | | |
 | `solve` | `values`: object mapping declared input keys (including `key[index]`) to finite numbers in the report's displayed units; `fromPanel: "webView"` | One transaction: `start_new_run`, `clear_terminal_logs`, `terminal_log`…, `step_status_update`…, `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done`; or `solve_rejected` before starting |
 | `cancel_solve` | `fromPanel`: `webView` or `treeView`; no process id | Cancel the active in-process run; restore values and send `solve_failed`, the restored `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done` |
@@ -176,6 +178,7 @@ Host to UI (`type`):
 | `error` | `message` | Error log |
 | `history_update` | `data`: run list | History tab |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | Result tab selection |
+| `layout` | `request`: the `load_layout` id; `positions`: `{<unit name>: {x, y}}` (`{}` if none saved) | Process-flow diagram: applied only for the latest request of the displayed report and only if the user has not moved units yet; saved units keep these positions, the rest get automatic layout |
 | VS Code-only: `python_env_update`, `update_open_files`, `flowsheet_file_saved`, `highlight_view`, `github_issue_result` | | |
 | `init` (live-solve additions) | `loadApp` also accepts `"standalone"`; optional `capabilities: {live_solve: bool}` | `standalone` renders run control and results together from one init; only `live_solve: true` enables editing fixed declared inputs. Absent/false stays read-only, including VS Code |
 | `solve_rejected` | `message`: explanation; `errors`: object mapping input keys to error text (may be empty for busy) | Reject unknown/non-editable keys, non-finite or out-of-bounds values, or a concurrent solve. Keep draft edits and show errors beside the fields; no model changes |
@@ -220,9 +223,15 @@ def build(ctx):
   - a "collapse block" option to show a sub-block as one unit.
 - **View (inspector):**
   - React Flow (MIT) with elkjs (EPL-2.0) layered layout, left to right, using port sides from the icon registry;
-  - drag to reposition and save to `/api/layout`;
+  - drag to reposition; positions are saved per flowsheet through the `load_layout` / `save_layout` / `layout` messages in 5.2 (the UI does not call `/api/layout`);
   - hover a link to see stream values, and click to highlight its stream-table column;
   - export SVG/PNG.
+  - hover values and click-highlight use the arc's `stream_column` when present, else its `name`; without `stream_column`, multi-index arcs find no stream-table column;
+  - lazy chunk (React Flow, ELK, export) measured at 1,597 kB JavaScript (491 kB gzip) plus 16 kB CSS, above the 300 kB estimate;
+  - Requests to the lib `flowsheet_graph` action (from inspector pull request 6):
+    - optional `internal: true` on implementation sub-units (e.g. `fs.F101.split` inside the HDA flash), which the view hides; all other units are drawn;
+    - real `in`/`out` direction for unconnected ports currently reported `unknown` (e.g. HDA `S101.purge`, flash `Vap`/`Liq`);
+    - optional `stream_column` on each arc with the exact stream-table column key (multi-index arcs differ, e.g. `fs.stream[1,2]` vs `fs.stream[(1, 2)]`).
 - Mermaid stays as the simple tab.
 
 ### 5.5 Live solve semantics

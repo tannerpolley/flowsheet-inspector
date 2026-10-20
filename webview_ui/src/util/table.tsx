@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import css from '../css/table.module.css'
 
 /** A single cell value; null renders as "-" */
@@ -38,20 +39,35 @@ function renderCellContent(cell: TableCellValue, highlight?: string): React.Reac
  * @param rows - table body rows; each row must have the same length as headers
  * @param highlight - optional search term; matches in header and body cells
  *                    are highlighted
+ * @param highlightColumn - optional column index to mark and scroll into view
  * @returns a horizontally scrollable table element
  */
-export default function Table({ headers, rows, highlight }: {
+export default function Table({ headers, rows, highlight, highlightColumn }: {
     headers: TableCellValue[];
     rows: TableCellValue[][];
     highlight?: string;
+    highlightColumn?: number;
 }) {
+    const columnClass = (i: number) => (i === highlightColumn ? css.column_highlight : undefined);
+    // Scroll to the marked column when it is first shown or changes, not on
+    // every render (typing in search re-renders the table).
+    const highlightRef = useRef<HTMLTableCellElement>(null);
+    useEffect(() => {
+        highlightRef.current?.scrollIntoView({ block: 'center', inline: 'center' });
+    }, [highlightColumn]);
     return (
         <div className={css.table_wrapper}>
             <table className={css.data_table}>
                 <thead>
                     <tr>
                         {headers.map((header, i) => (
-                            <th key={i}>{renderCellContent(header, highlight)}</th>
+                            <th
+                                key={i}
+                                className={columnClass(i)}
+                                ref={i === highlightColumn ? highlightRef : undefined}
+                            >
+                                {renderCellContent(header, highlight)}
+                            </th>
                         ))}
                     </tr>
                 </thead>
@@ -59,7 +75,7 @@ export default function Table({ headers, rows, highlight }: {
                     {rows.map((row, rowIdx) => (
                         <tr key={rowIdx}>
                             {row.map((cell, cellIdx) => (
-                                <td key={cellIdx}>{renderCellContent(cell, highlight)}</td>
+                                <td key={cellIdx} className={columnClass(cellIdx)}>{renderCellContent(cell, highlight)}</td>
                             ))}
                         </tr>
                     ))}

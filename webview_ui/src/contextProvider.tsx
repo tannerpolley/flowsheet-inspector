@@ -48,6 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Set when the extension reports the active flowsheet file was saved,
     // cleared when a new run starts or the user switches flowsheets.
     const [flowsheetSaveNotice, setFlowsheetSaveNotice] = useState(false);
+    const [highlightedStream, setHighlightedStream] = useState<string | null>(null);
 
     return (
         <AppContext.Provider value={{
@@ -92,7 +93,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             currentPythonEnv,
             setCurrentPythonEnv,
             flowsheetSaveNotice,
-            setFlowsheetSaveNotice
+            setFlowsheetSaveNotice,
+            highlightedStream,
+            setHighlightedStream
         }}>
             {children}
         </AppContext.Provider>

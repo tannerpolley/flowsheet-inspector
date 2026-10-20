@@ -1,0 +1,130 @@
+.container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+}
+
+.flow {
+    flex: 1;
+    min-height: 300px;
+    position: relative;
+    border: 1px solid var(--vscode-panel-border, #444);
+}
+
+.toolbar {
+    flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.toolbar button {
+    padding: 4px 10px;
+    border-radius: 3px;
+    color: var(--vscode-button-foreground, #fff);
+    background: var(--vscode-button-background, #0e639c);
+}
+
+.toolbar button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.hint {
+    color: var(--vscode-descriptionForeground, #888);
+    font-size: 12px;
+}
+
+/* Unit node */
+.unit {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--vscode-editorWidget-border, #666);
+    border-radius: 4px;
+    background: var(--vscode-editorWidget-background, #252526);
+    color: var(--vscode-editor-foreground, #ccc);
+}
+
+.unit_label {
+    font-weight: bold;
+}
+
+.unit_class {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.port_label {
+    position: absolute;
+    font-size: 10px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--vscode-descriptionForeground, #888);
+    pointer-events: none;
+}
+
+.left { left: 7px; transform: translateY(-50%); }
+.right { right: 7px; transform: translateY(-50%); }
+.top { top: 5px; transform: translateX(-50%); }
+.bottom { bottom: 5px; transform: translateX(-50%); }
+
+/* Stream hover */
+.tooltip {
+    position: fixed;
+    z-index: 10;
+    max-height: 60vh;
+    overflow: auto;
+    padding: 6px 8px;
+    font-size: 12px;
+    pointer-events: none;
+    border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+    background: var(--vscode-editorHoverWidget-background, #252526);
+    color: var(--vscode-editorHoverWidget-foreground, #ccc);
+}
+
+.tooltip_title {
+    font-weight: bold;
+}
+
+.tooltip td {
+    padding: 0 6px 0 0;
+}
+
+/* Empty states, matching the Diagram tab */
+.empty {
+    padding: 20px;
+    margin-top: 20px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.empty_title {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+}
+
+.error_box {
+    color: var(--vscode-editorError-foreground, #f88);
+    padding: 10px;
+    border: 1px solid var(--vscode-editorError-foreground, #f88);
+    border-radius: 4px;
+    margin-top: 10px;
+    background-color: var(--vscode-editorError-background, transparent);
+}
+
+.error_title {
+    margin: 0 0 10px 0;
+    font-weight: bold;
+}
+
+.error_body {
+    margin: 0 0 10px 0;
+    color: var(--vscode-editor-foreground, #ccc);
+}

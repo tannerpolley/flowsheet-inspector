@@ -4,11 +4,13 @@ import { IFrontendMessage } from "../interface";
 import runFlowsheet from "./run_flowsheet";
 import { getWebview, brodcastMessage, setResultsPanelTitle } from "./webview_handler";
 import { killProcessTree } from './platform_config';
-import { queryReportById, queryStepStatusesByRunId, queryRunException, queryReportFilenameById } from './sqlite_reader';
+import { queryReportById, queryStepStatusesByRunId, queryRunException, queryReportFilePathById } from './sqlite_reader';
 import { broadcastCurrentPythonEnv, isPythonExtensionInstalled } from './python_env';
 import { showFallbackInterpreterPicker } from './python_env_fallback';
 import { suppressNextTabSwitchFor } from './activate_tab_handler';
 import postGithubIssue, { IGithubIssueRequest } from './post_github_issue';
+import * as path from 'path';
+import { getDisplayedFlowsheet, readLayout, setDisplayedFlowsheet, writeLayout } from './flowsheet_layout';
 
 export default function webviewReceiveMessageHandler(context: vscode.ExtensionContext, frontendMessage: IFrontendMessage) {
     console.log(`receive frontend instruction: ${JSON.stringify(frontendMessage)}`);
@@ -121,8 +123,11 @@ export default function webviewReceiveMessageHandler(context: vscode.ExtensionCo
 
                     // Retitle the results panel to the flowsheet file this run
                     // actually belongs to — it was titled from the active
-                    // editor when the panel opened.
-                    setResultsPanelTitle(queryReportFilenameById(Number(frontendMessage.id)));
+                    // editor when the panel opened. Its diagram layout is
+                    // stored with that file too.
+                    const flowsheetFile = queryReportFilePathById(Number(frontendMessage.id));
+                    setResultsPanelTitle(flowsheetFile);
+                    setDisplayedFlowsheet(flowsheetFile);
 
                     brodcastMessage({ type: 'flowsheet_runner_result', data: parsedData });
 
@@ -142,6 +147,26 @@ export default function webviewReceiveMessageHandler(context: vscode.ExtensionCo
                 }
             }
             break;
+        case 'load_layout':
+        case 'save_layout': {
+            // Process-flow positions are stored next to the flowsheet of the displayed report.
+            const flowsheetFile = getDisplayedFlowsheet();
+            if (!path.isAbsolute(flowsheetFile)) {
+                webviewPanel.webview.postMessage({ type: 'error', message: 'The displayed report has no flowsheet file to store the diagram layout with.' });
+                break;
+            }
+            try {
+                if (instruction === 'save_layout') {
+                    writeLayout(flowsheetFile, frontendMessage.positions);
+                } else {
+                    // `request` lets the webview drop replies to requests it has superseded.
+                    webviewPanel.webview.postMessage({ type: 'layout', request: frontendMessage.request, positions: readLayout(flowsheetFile) });
+                }
+            } catch (e: any) {
+                webviewPanel.webview.postMessage({ type: 'error', message: `Diagram layout ${instruction} failed: ${e.message}` });
+            }
+            break;
+        }
         default:
             console.log(`receive unknown instruction: ${instruction}`);
     }

@@ -24,11 +24,17 @@ function cleanDir(dir: string) {
   }
 }
 
+// Everything ships in one `index` chunk except the process-flow view (React
+// Flow + ELK), which loads when its tab opens.
+const PROCESS_FLOW = /node_modules\/(@xyflow|elkjs|html-to-image|zustand|classcat)\/|src\/web_view\/(process_flow|flowsheet_graph)\./
+
 // https://vite.dev/config/
 // `vite build --mode browser` emits standalone assets for the browser host
 // (served by fi-serve) into dist-browser/ and leaves the extension copy alone.
+// Relative asset paths let the lazy chunk resolve next to the main one in both
+// hosts (the extension rewrites ./assets/ in index.html to webview URIs).
 export default defineConfig(({ mode }) => ({
-  ...(mode === 'browser' && { base: './' }),
+  base: './',
   plugins: [
     react(),
     mode !== 'browser' && {
@@ -51,7 +57,7 @@ export default defineConfig(({ mode }) => ({
     ...(mode === 'browser' && { outDir: 'dist-browser' }),
     rollupOptions: {
       output: {
-        inlineDynamicImports: true,
+        manualChunks: (id) => (PROCESS_FLOW.test(id) ? 'process_flow' : 'index'),
       }
     }
   }

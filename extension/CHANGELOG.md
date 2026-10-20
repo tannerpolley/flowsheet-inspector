@@ -2,6 +2,7 @@
 * Unreleased
 1. Add a declared inputs and outputs result tab, read-only in VS Code.
 2. Browser hosts can combine run control and results on one standalone page and advertise live solve, with bounded input edits, rebuild confirmation, cancellation, and rollback feedback.
+3. Add a Process Flow result tab: an interactive diagram of the flowsheet's units and streams. Dragged unit positions are saved next to the flowsheet file, hovering a stream shows its values, clicking it marks its stream-table column, and the diagram exports to SVG or PNG.
 
 * 0.0.15
 1. Add a feedback panel that lets users submit an issue to the GitHub repo or send a feedback email to flowsheetinspector@lbl.gov.

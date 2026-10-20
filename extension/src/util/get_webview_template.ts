@@ -17,12 +17,10 @@ export function getReactTemplate(
     // Read HTML content
     let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
 
-    // Replace relative asset paths with webview URIs
-    // Vite builds with base: './' will output paths like ./assets/...
-    htmlContent = htmlContent.replace(/\.\/assets\//g, `${assetsUri}/`);
-
-    // Also handle /assets/ paths just in case
-    htmlContent = htmlContent.replace(/\/assets\//g, `${assetsUri}/`);
+    // Replace asset paths with webview URIs. Vite builds with base: './' and
+    // output ./assets/...; one pass, since the rewritten URI itself contains /assets/.
+    // Lazy chunks then load relative to the main script, so they need no rewrite.
+    htmlContent = htmlContent.replace(/\.?\/assets\//g, `${assetsUri}/`);
 
     return htmlContent;
 }

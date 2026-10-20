@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect, useRef } from "react";
+import { useState, useContext, useEffect, useRef, lazy, Suspense } from "react";
 import { AppContext } from "../context";
 import { host, type HostMessage } from "../host";
 import Mermaid from "./meraid";
@@ -8,9 +8,12 @@ import Variable from "../variable_view/flowsheet_variable_display";
 import LogsView from "./logs";
 import css from "../css/webview_maindisplay.module.css";
 import InputsPanel from "./inputs_panel";
+
+// React Flow and ELK are large; load them only when the tab opens.
+const ProcessFlow = lazy(() => import("./process_flow"));
 export default function WebView() {
     const [activeTab, setActiveTab] = useState('diagram');
-    const { extensionErrorLogs, setActiveLogTab } = useContext(AppContext);
+    const { extensionErrorLogs, setActiveLogTab, setHighlightedStream } = useContext(AppContext);
     const [flashLogs, setFlashLogs] = useState(false);
     const prevLogsLength = useRef(extensionErrorLogs.length);
     const { flowsheetRunnerResult, activateFileName } = useContext(AppContext);
@@ -45,6 +48,16 @@ export default function WebView() {
         case 'diagram':
             display = <Mermaid />;
             break;
+        case 'process_flow':
+            display = (
+                <Suspense fallback={<p>Loading process flow…</p>}>
+                    <ProcessFlow onShowStream={(column) => {
+                        setHighlightedStream(column);
+                        setActiveTab('variable');
+                    }} />
+                </Suspense>
+            );
+            break;
         case 'variable':
             display = <Variable />;
             break;
@@ -73,6 +86,11 @@ export default function WebView() {
                     className={`${css.nav_item} ${activeTab === 'diagram' ? css.nav_item_active : ''}`}
                     onClick={() => changeActivateTabHandler('diagram')}>
                     DIAGRAM
+                </li>
+                <li
+                    className={`${css.nav_item} ${activeTab === 'process_flow' ? css.nav_item_active : ''}`}
+                    onClick={() => changeActivateTabHandler('process_flow')}>
+                    PROCESS FLOW
                 </li>
                 <li
                     className={`${css.nav_item} ${activeTab === 'variable' ? css.nav_item_active : ''}`}
