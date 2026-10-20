@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildSolveMessage, formatValue, groupVariables, isEditable, supportsLiveSolve, validateValue, type DeclaredVariable } from './inputs';
+import { buildSolveMessage, formatValue, groupVariables, isEditable, supportsLiveSolve, validateValue, emptyInputsState, receiveInputsMessage, type DeclaredVariable } from './inputs';
 
 const feed: DeclaredVariable = {
     key: 'feed[0]', title: 'Feed', description: '', units: 'L/h', value: 1.23456,
@@ -70,4 +70,54 @@ test('preserves arbitrary annotation keys when serializing solve values and erro
     const valid = buildSolveMessage([variable], pending, true);
     expect(JSON.parse(JSON.stringify(valid.message)).values).toEqual({ ['__proto__']: 2 });
     expect(Object.keys(buildSolveMessage([], pending, true).errors)).toEqual(['__proto__']);
+});
+
+function report(variables = [feed]) {
+    return { type: 'flowsheet_runner_result', data: { actions: { inputs: { variables } } } };
+}
+
+test('replayed reports preserve unsent edits, field errors and rebuild confirmation', () => {
+    const draft = { ...emptyInputsState, pending: { [feed.key]: '2.50' },
+        errors: { [feed.key]: 'Host validation error' }, confirmRebuild: true };
+    const replayed = receiveInputsMessage(draft, report(), true);
+    expect(replayed.pending).toEqual({ [feed.key]: '2.50' });
+    expect(replayed.errors).toEqual(draft.errors);
+    expect(replayed.confirmRebuild).toBe(true);
+    // The idle lifecycle message in a reconnect snapshot must also retain the draft.
+    expect(receiveInputsMessage(replayed, { type: 'run_flowsheet_done' }, true)).toEqual(replayed);
+});
+
+test('a report without a drafted key drops its draft and field error', () => {
+    const draft = { ...emptyInputsState, pending: { [feed.key]: '2.50' }, errors: { [feed.key]: 'Old error' } };
+    const updated = receiveInputsMessage(draft, report([]), true);
+    expect(updated.pending).toEqual({});
+    expect(updated.errors).toEqual({});
+});
+
+test('new reports remove drafts for non-editable inputs and recheck current bounds', () => {
+    const draft = { ...emptyInputsState, pending: { [feed.key]: '2.50' } };
+    for (const variable of [{ ...feed, fixed: false }, { ...feed, is_input: false }]) {
+        expect(receiveInputsMessage(draft, report([variable]), true).pending).toEqual({});
+    }
+    expect(receiveInputsMessage(draft, report(), false).pending).toEqual({});
+    const bounded = { ...feed, bounds: [0, 2] as [number, number] };
+    const updated = receiveInputsMessage(draft, report([bounded]), true);
+    expect(updated.pending).toEqual(draft.pending);
+    expect(buildSolveMessage([bounded], updated.pending, true).errors[feed.key]).toBe('Must be at most 2.');
+});
+
+test('failed Cancel errors leave the solve active and later failure and done retain the rollback notice', () => {
+    const solving = { ...emptyInputsState, pending: { [feed.key]: '2.50' },
+        attempt: { report: false, failed: false }, notice: 'Cancellation requested. Waiting for the host…' };
+    const cancelFailed = receiveInputsMessage(solving,
+        { type: 'error', message: 'Request to fi-serve failed: Error: HTTP 500' }, true);
+    expect(cancelFailed.attempt).not.toBeNull();
+    const failed = receiveInputsMessage(cancelFailed,
+        { type: 'solve_failed', message: 'Solver failed.', rolled_back: true }, true);
+    expect(failed.attempt?.failed).toBe(true);
+    const completed = receiveInputsMessage(receiveInputsMessage(failed, report(), true),
+        { type: 'run_flowsheet_done' }, true);
+    expect(completed.attempt).toBeNull();
+    expect(completed.notice).toBe('Solver failed. Input and model values were rolled back.');
+    expect(completed.pending).toEqual({});
 });

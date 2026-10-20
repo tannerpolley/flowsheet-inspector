@@ -36,6 +36,8 @@ function vscodeHost(): Host {
  * messages from the `api/events` server-sent-event stream. Both routes are
  * resolved against the page URL, which also carries the session `token`.
  */
+const RUN_INSTRUCTIONS = new Set(['run_flowsheet', 'solve']);
+
 function httpHost(pageUrl: string): Host {
     const page = new URL(pageUrl);
     const token = page.searchParams.get('token') ?? '';
@@ -77,10 +79,10 @@ function httpHost(pageUrl: string): Host {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 })
                 // Report it as the extension does: an error, and a rejected run
-                // ends so the Run button comes back.
+                // or solve (which uses the run lifecycle) ends so Run comes back.
                 .catch((error) => {
                     dispatch({ type: 'error', message: `Request to fi-serve failed: ${error}` });
-                    if (message?.frontendInstruction === 'run_flowsheet') dispatch({ type: 'run_flowsheet_done' });
+                    if (RUN_INSTRUCTIONS.has(message?.frontendInstruction)) dispatch({ type: 'run_flowsheet_done' });
                 });
         },
         onMessage(listener) {

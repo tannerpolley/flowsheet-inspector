@@ -23,7 +23,16 @@ export default function RunFlowsheet() {
 
     const [elapsedTime, setElapsedTime] = useState(0);
     const [dots, setDots] = useState(".");
+    const [wasRunning, setWasRunning] = useState(isRunningFlowsheet);
     const [activePid, setActivePid] = useState<number | null>(null);
+
+    if (isRunningFlowsheet !== wasRunning) {
+        setWasRunning(isRunningFlowsheet);
+        if (isRunningFlowsheet) {
+            setElapsedTime(0);
+            setDots(".");
+        }
+    }
 
     /**
      * Handler for running the flowsheet by sending a "run_flowsheet" message to the extension backend, the backend should start run flowsheet, and record a process id to use for killing the process.
@@ -41,8 +50,6 @@ export default function RunFlowsheet() {
                 selectedSteps: lastSelectedStep
             }
         );
-        setElapsedTime(0);
-        setDots(".");
         setExtensionErrorLogs([]); // Clear logs on new run
         setTerminalLogs([]); // Clear terminal on new run
         setFlowsheetSaveNotice(false); // This run picks up the saved edits

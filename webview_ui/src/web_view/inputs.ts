@@ -1,3 +1,5 @@
+import type { HostMessage } from '../host';
+
 export interface DeclaredVariable {
     key: string;
     title: string;
@@ -72,4 +74,49 @@ export function buildSolveMessage(variables: DeclaredVariable[], pending: Record
         errors,
         rebuild,
     };
+}
+
+export interface InputsState {
+    pending: Record<string, string>;
+    errors: Record<string, string>;
+    notice: string;
+    confirmRebuild: boolean;
+    attempt: { report: boolean; failed: boolean } | null;
+}
+
+export const emptyInputsState: InputsState = {
+    pending: {}, errors: {}, notice: '', confirmRebuild: false, attempt: null,
+};
+
+/** Only solve lifecycle messages can finish an attempt; generic errors are log entries. */
+export function receiveInputsMessage(state: InputsState, message: HostMessage, liveSolve: boolean): InputsState {
+    switch (message.type) {
+        case 'start_new_run':
+            return state.attempt ? { ...state, notice: 'Solving…' } : state;
+        case 'flowsheet_runner_result': {
+            if (state.attempt) return { ...state, attempt: { ...state.attempt, report: true } };
+            // Reconnect snapshots retain drafts, but the current report owns editability and bounds.
+            const variables: DeclaredVariable[] = message.data?.actions?.inputs?.variables ?? [];
+            const pending = Object.fromEntries(Object.entries(state.pending).filter(([key]) =>
+                variables.some((variable) => variable.key === key && isEditable(variable, liveSolve))));
+            const errors = Object.fromEntries(Object.entries(state.errors).filter(([key]) => Object.hasOwn(pending, key)));
+            return { ...state, pending, errors };
+        }
+        case 'solve_rejected':
+            return state.attempt ? { ...state, attempt: null, errors: message.errors ?? {},
+                notice: message.message || 'Solve rejected. Check the pending inputs.' } : state;
+        case 'solve_failed':
+            return state.attempt ? { ...state, pending: {}, errors: {},
+                attempt: { ...state.attempt, failed: true },
+                notice: `${message.message || 'Solve failed.'} ${message.rolled_back === true
+                    ? 'Input and model values were rolled back.' : 'Rollback was not confirmed by the host.'}` } : state;
+        case 'run_flowsheet_done':
+            if (!state.attempt) return state;
+            return { ...state, attempt: null, confirmRebuild: false,
+                ...(state.attempt.report && { pending: {}, errors: {} }),
+                notice: state.attempt.failed ? state.notice : state.attempt.report
+                    ? 'Solve completed. Results updated.' : 'Run ended without an updated report.' };
+        default:
+            return state;
+    }
 }

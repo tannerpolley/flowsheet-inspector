@@ -13,7 +13,7 @@ export default function WebView() {
     const { extensionErrorLogs, setActiveLogTab } = useContext(AppContext);
     const [flashLogs, setFlashLogs] = useState(false);
     const prevLogsLength = useRef(extensionErrorLogs.length);
-    const { flowsheetRunnerResult } = useContext(AppContext);
+    const { flowsheetRunnerResult, activateFileName } = useContext(AppContext);
 
     // total model dof
     const totalDof = flowsheetRunnerResult?.actions?.degrees_of_freedom?.model;
@@ -107,7 +107,7 @@ export default function WebView() {
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                 {display}
                 {/* Keep drafts and solve progress alive when switching result tabs. */}
-                <div hidden={activeTab !== 'inputs'}><InputsPanel /></div>
+                <div hidden={activeTab !== 'inputs'}><InputsPanel key={activateFileName} /></div>
             </div>
         </div>
     );

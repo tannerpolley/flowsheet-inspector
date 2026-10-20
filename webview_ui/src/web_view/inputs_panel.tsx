@@ -1,75 +1,32 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../context';
 import { host } from '../host';
-import { buildSolveMessage, formatValue, groupVariables, isEditable, validateValue } from './inputs';
+import { buildSolveMessage, formatValue, groupVariables, isEditable, validateValue, emptyInputsState, receiveInputsMessage } from './inputs';
 import css from '../css/inputs.module.css';
 
 export default function InputsPanel() {
     const { flowsheetRunnerResult, liveSolveEnabled, isRunningFlowsheet, setIsRunningFlowsheet,
         terminalLogs, stepStatuses } = useContext(AppContext);
     const variables = flowsheetRunnerResult?.actions?.inputs?.variables ?? [];
-    const [pending, setPending] = useState<Record<string, string>>({});
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [notice, setNotice] = useState('');
-    const [confirmRebuild, setConfirmRebuild] = useState(false);
-    const attempt = useRef<{ report: boolean; failed: boolean } | null>(null);
+    const [state, setState] = useState(emptyInputsState);
+    const { pending, errors, notice, confirmRebuild, attempt } = state;
     const transaction = buildSolveMessage(variables, pending, liveSolveEnabled);
     const pendingCount = Object.keys(transaction.message.values).length + Object.keys(transaction.errors).length;
 
     useEffect(() => host.onMessage((message) => {
-        switch (message.type) {
-            case 'start_new_run':
-                if (attempt.current) setNotice('Solving…');
-                break;
-            case 'flowsheet_runner_result':
-                if (attempt.current) attempt.current.report = true;
-                else {
-                    setPending({});
-                    setErrors({});
-                    setConfirmRebuild(false);
-                }
-                break;
-            case 'solve_rejected':
-                if (!attempt.current) break;
-                setErrors(message.errors ?? {});
-                setNotice(message.message || 'Solve rejected. Check the pending inputs.');
-                attempt.current = null;
-                setIsRunningFlowsheet(false);
-                break;
-            case 'solve_failed':
-                if (!attempt.current) break;
-                attempt.current.failed = true;
-                setPending({});
-                setErrors({});
-                setNotice(`${message.message || 'Solve failed.'} ${message.rolled_back === true
-                    ? 'Input and model values were rolled back.' : 'Rollback was not confirmed by the host.'}`);
-                break;
-            case 'run_flowsheet_done':
-                if (!attempt.current) break;
-                if (!attempt.current.failed) {
-                    setNotice(attempt.current.report ? 'Solve completed. Results updated.' : 'Run ended without an updated report.');
-                    if (attempt.current.report) { setPending({}); setErrors({}); }
-                }
-                attempt.current = null;
-                setIsRunningFlowsheet(false);
-                break;
-            case 'error':
-                if (!attempt.current) break;
-                setNotice(message.message || 'The solve request failed.');
-                attempt.current = null;
-                setIsRunningFlowsheet(false);
-                break;
-        }
-    }), []);
+        setState((previous) => receiveInputsMessage(previous, message, liveSolveEnabled));
+        if (message.type === 'solve_rejected') setIsRunningFlowsheet(false);
+    }), [liveSolveEnabled, setIsRunningFlowsheet]);
 
     function solve() {
-        if (isRunningFlowsheet || attempt.current || !pendingCount) return;
-        setErrors(transaction.errors);
+        if (isRunningFlowsheet || attempt || !pendingCount) return;
         if (Object.keys(transaction.errors).length) return;
-        if (transaction.rebuild.length && !confirmRebuild) { setConfirmRebuild(true); return; }
-        setConfirmRebuild(false);
-        attempt.current = { report: false, failed: false };
-        setNotice('Requesting solve…');
+        if (transaction.rebuild.length && !confirmRebuild) {
+            setState((previous) => ({ ...previous, confirmRebuild: true }));
+            return;
+        }
+        setState((previous) => ({ ...previous, confirmRebuild: false,
+            attempt: { report: false, failed: false }, notice: 'Requesting solve…' }));
         setIsRunningFlowsheet(true);
         host.postMessage(transaction.message);
     }
@@ -86,17 +43,17 @@ export default function InputsPanel() {
                 <span>{pendingCount} pending {pendingCount === 1 ? 'edit' : 'edits'}</span>
                 <button onClick={solve} disabled={isRunningFlowsheet || !pendingCount}>Solve</button>
                 <button disabled={isRunningFlowsheet || !Object.keys(pending).length} onClick={() => {
-                    setPending({}); setErrors({}); setConfirmRebuild(false); setNotice('');
+                    setState(emptyInputsState);
                 }}>Discard edits</button>
                 {isRunningFlowsheet && <button onClick={() => {
                     host.postMessage({ frontendInstruction: 'cancel_solve', fromPanel: 'webView' });
-                    setNotice('Cancellation requested. Waiting for the host…');
+                    setState((previous) => ({ ...previous, notice: 'Cancellation requested. Waiting for the host…' }));
                 }}>Cancel</button>}
             </div>}
             {confirmRebuild && <div className={css.warning} role="alert">
                 <p>These edits require rebuilding the model: {transaction.rebuild.join(', ')}. This can take longer than a re-solve.</p>
                 <button onClick={solve} disabled={isRunningFlowsheet}>Confirm rebuild and solve</button>
-                <button onClick={() => setConfirmRebuild(false)}>Keep editing</button>
+                <button onClick={() => setState((previous) => ({ ...previous, confirmRebuild: false }))}>Keep editing</button>
             </div>}
             <p role="status">{notice}</p>
             {liveSolveEnabled && isRunningFlowsheet && <div role="status">
@@ -128,10 +85,13 @@ export default function InputsPanel() {
                                         aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined}
                                         value={draft ?? formatValue(variable.value, variable.rounding).replace('—', '')}
                                         onChange={(event) => {
-                                            setPending((prev) => ({ ...prev, [variable.key]: event.target.value }));
-                                            setErrors((prev) => { const next = { ...prev }; delete next[variable.key]; return next; });
-                                            setConfirmRebuild(false);
-                                            setNotice('');
+                                            const value = event.target.value;
+                                            setState((previous) => {
+                                                const errors = { ...previous.errors };
+                                                delete errors[variable.key];
+                                                return { ...previous, pending: { ...previous.pending, [variable.key]: value },
+                                                    errors, confirmRebuild: false, notice: '' };
+                                            });
                                         }} />
                                     {changed && <small className={css.pending}>Pending (current: {formatValue(variable.value, variable.rounding)})</small>}
                                     {error && <small id={`${id}-error`} className={css.error} role="alert">{error}</small>}
