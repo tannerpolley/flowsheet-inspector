@@ -68,6 +68,23 @@ test('uses HTTP plus server-sent events in a plain browser', async () => {
         [{ type: 'run_flowsheet_done' }],
     ]));
 
+    // Failed solve POSTs end locally through the same lifecycle as Run.
+    received.mockClear();
+    fetchMock.mockResolvedValueOnce(new Response('failed', { status: 500 }));
+    host.postMessage({ frontendInstruction: 'solve', fromPanel: 'webView', values: { feed: 2 } });
+    await vi.waitFor(() => expect(received.mock.calls).toEqual([
+        [{ type: 'error', message: 'Request to fi-serve failed: Error: HTTP 500' }],
+        [{ type: 'run_flowsheet_done' }],
+    ]));
+
+    // A failed cancellation cannot finish the run that is still active on the host.
+    received.mockClear();
+    fetchMock.mockResolvedValueOnce(new Response('failed', { status: 500 }));
+    host.postMessage({ frontendInstruction: 'cancel_solve', fromPanel: 'webView' });
+    await vi.waitFor(() => expect(received.mock.calls).toEqual([
+        [{ type: 'error', message: 'Request to fi-serve failed: Error: HTTP 500' }],
+    ]));
+
     // A stream the browser gives up on is reported; retries are not.
     received.mockClear();
     source.onerror!();

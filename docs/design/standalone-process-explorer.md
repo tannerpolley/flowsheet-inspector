@@ -142,7 +142,7 @@ exchanges with the extension, unchanged in shape. It needs one route beyond the 
 - **Connection snapshot.** Each time `/api/events` connects (first load and the browser's automatic reconnects), `fi-serve` first sends what a freshly loaded page needs: `init` (`loadApp`, `fileName`), `switch_tab` with the real `idaesRunInfo` (not a `null` placeholder, which would reset the step selection), the latest step rows as `step_status_update` with `reset: true`, the current report as `flowsheet_runner_result` if one exists, and `run_flowsheet_done` if no run is active. The UI opens the stream only once it is listening, so the snapshot is not dropped, and it sends requests without waiting for the stream.
 - **Open item (owners: lib pull request 5 with inspector pull request 7).** A page that connects while a run is in progress, or reconnects during one, cannot yet show it as running: the UI enters the running state only from its own Run click, and a lost `process_started` leaves Cancel without a process id. Likewise a Run click whose POST is accepted after an idle snapshot arrives shows as idle. Fixing this needs a run-state message the UI can apply on connect; it is not part of pull request 4.
 - `fi-serve` refuses the page itself (HTTP 401 with a plain message) when the `token` is missing or wrong, so a bad URL shows an error rather than a blank page.
-- A failed POST (network error or non-2xx) shows up in the UI as an `error` message; for `run_flowsheet` the UI also ends the run locally, as if `run_flowsheet_done` had arrived. Unparseable event data and an event stream the browser has stopped retrying also show up as `error`.
+- A failed POST (network error or non-2xx) shows up in the UI as an `error` message; for `run_flowsheet` and `solve` the UI also ends the run locally, as if `run_flowsheet_done` had arrived. Unparseable event data and an event stream the browser has stopped retrying also show up as `error`.
 - Known limit: if the server stops between serving the page and the first stream connection, the browser keeps retrying and the page stays on its loading state.
 - The browser build is `npm run build -- --mode browser` in `webview_ui`. It writes `webview_ui/dist-browser/` with relative asset paths. The lib serves that directory.
 - The UI reaches `fi-serve` only through these two routes, so one message protocol serves both hosts. Later inspector units (diagram layout, inputs and re-solve, costing, scenarios) append their message types to the tables below. The other REST routes in the table above remain the lib's choice for scripts and tests; the UI does not call them.
@@ -157,6 +157,8 @@ UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webVi
 | `pull_flowsheet_history` | `id`: reportdb run id | `flowsheet_runner_result`, `step_status_update` (`reset: true`), or `error` |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | the same `switch_sub_tab` broadcast back |
 | VS Code-only: `focus_view`, `focus_document` (`target`, `line`), `open_interpreter_picker`, `post_github_issue` (reply `github_issue_result`) | | |
+| `solve` | `values`: object mapping declared input keys (including `key[index]`) to finite numbers in the report's displayed units; `fromPanel: "webView"` | One transaction: `start_new_run`, `clear_terminal_logs`, `terminal_log`…, `step_status_update`…, `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done`; or `solve_rejected` before starting |
+| `cancel_solve` | `fromPanel`: `webView` or `treeView`; no process id | Cancel the active in-process run; restore values and send `solve_failed`, the restored `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done` |
 
 The UI also posts bare acknowledgements `{reload_mermaid: "done"}` and `{reload_webview: "done"}` with no `frontendInstruction`; the host may ignore them.
 
@@ -175,6 +177,9 @@ Host to UI (`type`):
 | `history_update` | `data`: run list | History tab |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | Result tab selection |
 | VS Code-only: `python_env_update`, `update_open_files`, `flowsheet_file_saved`, `highlight_view`, `github_issue_result` | | |
+| `init` (live-solve additions) | `loadApp` also accepts `"standalone"`; optional `capabilities: {live_solve: bool}` | `standalone` renders run control and results together from one init; only `live_solve: true` enables editing fixed declared inputs. Absent/false stays read-only, including VS Code |
+| `solve_rejected` | `message`: explanation; `errors`: object mapping input keys to error text (may be empty for busy) | Reject unknown/non-editable keys, non-finite or out-of-bounds values, or a concurrent solve. Keep draft edits and show errors beside the fields; no model changes |
+| `solve_failed` | `message`: explanation; `rolled_back: true` | Solver failure, exception, timeout or cancellation restored the pre-solve model values. Also send the restored `flowsheet_runner_result`, final `step_status_update`, then `run_flowsheet_done` |
 
 The UI still handles `update` and `flowsheet_detail`, but the extension no longer sends them; the browser host need not either.
 

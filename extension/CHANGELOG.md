@@ -1,4 +1,8 @@
 # Change Log
+* Unreleased
+1. Add a declared inputs and outputs result tab, read-only in VS Code.
+2. Browser hosts can combine run control and results on one standalone page and advertise live solve, with bounded input edits, rebuild confirmation, cancellation, and rollback feedback.
+
 * 0.0.15
 1. Add a feedback panel that lets users submit an issue to the GitHub repo or send a feedback email to flowsheetinspector@lbl.gov.
 2. Add a rerun notice: when a user changes and saves a flowsheet, a notice appears in the control panel reminding them to rerun the inspector.

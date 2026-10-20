@@ -19,6 +19,7 @@ import {
 
 
 export function AppProvider({ children }: { children: ReactNode }) {
+    const [liveSolveEnabled, setLiveSolveEnabled] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [idaesRunInfo, setidaesRunInfo] = useState<idaesRunInfo>({
         classname: "",
@@ -50,6 +51,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     return (
         <AppContext.Provider value={{
+            liveSolveEnabled,
+            setLiveSolveEnabled,
             isLoading,
             setIsLoading,
             selectedSteps,

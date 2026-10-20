@@ -34,6 +34,8 @@ export type ActiveLogTab = 'error' | 'terminal';
 export type SetActiveLogTab = React.Dispatch<React.SetStateAction<ActiveLogTab>>;
 
 interface AppContextType {
+    liveSolveEnabled: boolean;
+    setLiveSolveEnabled: React.Dispatch<React.SetStateAction<boolean>>;
     isLoading: boolean;
     setIsLoading: (isLoading: boolean) => void;
     selectedSteps: FlowsheetSteps;

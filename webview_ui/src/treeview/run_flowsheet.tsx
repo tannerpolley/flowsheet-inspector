@@ -4,6 +4,7 @@ import { AppContext } from "../context";
 import css from "../css/run_flowsheet.module.css";
 export default function RunFlowsheet() {
     const {
+        liveSolveEnabled,
         isLoading,
         isRunningFlowsheet,
         setIsRunningFlowsheet,
@@ -22,14 +23,23 @@ export default function RunFlowsheet() {
 
     const [elapsedTime, setElapsedTime] = useState(0);
     const [dots, setDots] = useState(".");
+    const [wasRunning, setWasRunning] = useState(isRunningFlowsheet);
     const [activePid, setActivePid] = useState<number | null>(null);
+
+    if (isRunningFlowsheet !== wasRunning) {
+        setWasRunning(isRunningFlowsheet);
+        if (isRunningFlowsheet) {
+            setElapsedTime(0);
+            setDots(".");
+        }
+    }
 
     /**
      * Handler for running the flowsheet by sending a "run_flowsheet" message to the extension backend, the backend should start run flowsheet, and record a process id to use for killing the process.
      * Also this will set isRunningFlowsheet to true, this will start the loading animation.   
      */
     const runFlowsheetHandler = () => {
-        if (isLoading) return;
+        if (isLoading || isRunningFlowsheet) return;
         const lastSelectedStep = selectedSteps.length > 0
             ? selectedSteps[selectedSteps.length - 1]
             : "";
@@ -40,8 +50,6 @@ export default function RunFlowsheet() {
                 selectedSteps: lastSelectedStep
             }
         );
-        setElapsedTime(0);
-        setDots(".");
         setExtensionErrorLogs([]); // Clear logs on new run
         setTerminalLogs([]); // Clear terminal on new run
         setFlowsheetSaveNotice(false); // This run picks up the saved edits
@@ -49,6 +57,10 @@ export default function RunFlowsheet() {
     }
 
     const cancelFlowsheetRunHandler = () => {
+        if (liveSolveEnabled) {
+            host.postMessage({ frontendInstruction: 'cancel_solve', fromPanel: 'treeView' });
+            return;
+        }
         console.log(`cancelFlowsheetRunHandler triggered, activePid is: ${activePid}`);
         host.postMessage(
             {

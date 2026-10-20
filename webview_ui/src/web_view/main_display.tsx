@@ -7,12 +7,13 @@ import Diagnostic from "./diagnostic";
 import Variable from "../variable_view/flowsheet_variable_display";
 import LogsView from "./logs";
 import css from "../css/webview_maindisplay.module.css";
+import InputsPanel from "./inputs_panel";
 export default function WebView() {
     const [activeTab, setActiveTab] = useState('diagram');
     const { extensionErrorLogs, setActiveLogTab } = useContext(AppContext);
     const [flashLogs, setFlashLogs] = useState(false);
     const prevLogsLength = useRef(extensionErrorLogs.length);
-    const { flowsheetRunnerResult } = useContext(AppContext);
+    const { flowsheetRunnerResult, activateFileName } = useContext(AppContext);
 
     // total model dof
     const totalDof = flowsheetRunnerResult?.actions?.degrees_of_freedom?.model;
@@ -56,6 +57,8 @@ export default function WebView() {
         case 'logs':
             display = <LogsView />;
             break;
+        case 'inputs':
+            break;
         default:
             display = <div>Unknown tab: {activeTab}</div>
     }
@@ -95,9 +98,16 @@ export default function WebView() {
                     }}>
                     LOGS {flashLogs && <span className={`${css.blue_dot}`}></span>}
                 </li>
+                <li style={{ listStyle: 'none' }}>
+                    <button className={`${css.nav_item} ${activeTab === 'inputs' ? css.nav_item_active : ''}`}
+                        style={{ background: 'transparent', borderRadius: 0 }}
+                        onClick={() => changeActivateTabHandler('inputs')}>INPUTS AND OUTPUTS</button>
+                </li>
             </ul>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                 {display}
+                {/* Keep drafts and solve progress alive when switching result tabs. */}
+                <div hidden={activeTab !== 'inputs'}><InputsPanel key={activateFileName} /></div>
             </div>
         </div>
     );
