@@ -141,6 +141,7 @@ exchanges with the extension, unchanged in shape. It needs one route beyond the 
 - Both routes resolve relative to the page URL, so the UI served at `/?token=…` calls `/api/message` and `/api/events?token=…`.
 - A failed POST (network error or non-2xx) shows up in the UI as an `error` message.
 - The browser build is `npm run build -- --mode browser` in `webview_ui`. It writes `webview_ui/dist-browser/` with relative asset paths. The lib serves that directory.
+- The UI reaches `fi-serve` only through these two routes, so one message protocol serves both hosts. Later inspector units (diagram layout, inputs and re-solve, costing, scenarios) append their message types to the tables below. The other REST routes in the table above remain the lib's choice for scripts and tests; the UI does not call them.
 
 UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webView`). The browser host must support the first group; the second is VS Code-only, and `fi-serve` may ignore those or answer with an `error` message.
 
