@@ -34,6 +34,8 @@ changes to the legacy `IDAES/idaes-ui` `fs.visualize()` app.
 | App shape | One React UI, two hosts: the existing VS Code webview, plus a browser host served by a `127.0.0.1` Python server in the lib |
 | Live solve | In-process: a long-lived Python process holds the built model; edits to declared inputs re-run steps from a declared step, with no rebuild and with rollback on failure |
 | Diagram | Add an interactive process-flow view (React Flow + ELK layout, ports, icons, saved positions); keep Mermaid as the simple view |
+| Licence | LBNL "Enhancements" clause accepted: LBNL may take any of this work |
+| Upstream posting | None for now. All work stays on the tannerpolley forks; no upstream issues or pull requests until the owner says otherwise |
 
 ## 3. Why here and not `IDAES/idaes-ui`
 
@@ -185,9 +187,9 @@ def build(ctx):
 
 ## 6. Upstream pull request sequence
 
-Each item is a separately reviewable pull request with its own tests and docs. Open an
-issue first in each target repository and link the idaes-pse "moved to lib" issues.
-Nothing is posted upstream without owner approval.
+Each item is a separately reviewable unit with its own tests and docs, built and merged on
+the forks. Owner decision 2026-10-20: nothing is opened upstream for now. When that changes,
+open an issue first in each target repository and link the idaes-pse "moved to lib" issues.
 
 | # | Repo | Pull request | Size goal |
 |---|---|---|---|
@@ -264,14 +266,14 @@ Changes go through the Lithium thread or a `tannerpolley/Lithium_Extraction` iss
 |---|---|
 | Upstream bandwidth. The inspector is mostly one author; 19 of its last 20 merges had no recorded review; lib PR #15 has been open since May | Issue first, small pull requests, and the fork stays usable on its own. Ask Dan Gunter and sspoon, the issue assigners, early |
 | The browser host is not on the inspector's stated plan (README: needs the VS Code host) | Pull request 4 is a no-behaviour-change refactor that is useful on its own (testability); propose browser mode in an issue before pull request 5 |
-| Licence. All three PrOMMiS repos grant LBNL a perpetual licence to publicly shared enhancements | Owner confirms this is acceptable before the first public push of feature code |
+| Licence. All three PrOMMiS repos grant LBNL a perpetual licence to publicly shared enhancements | Accepted by the owner 2026-10-20 |
 | Data contract drift between lib and inspector (no JSON Schema; the README says delete the DB on schema change) | Additive actions only; the version check from lib PR #41; generate TypeScript types from Pydantic in a later pull request |
 | Long or failing solves leave the model in a bad state | Snapshot and restore, timeout, cancel; structural changes force a rebuild |
 | A local server is reachable by any web page | `127.0.0.1` only, a per-session token, no CORS header, and edits allowed only on annotated inputs with bounds |
 | idaes-pse pin conflicts | Relax the lib pin (section 8) |
 | React Flow + ELK adds about 300 kB to the webview | Lazy-load the view; Mermaid stays the default if maintainers prefer |
 
-## 10. Side findings to report upstream (owner approval needed to post)
+## 10. Side findings for upstream (not posted; owner decision 2026-10-20 is fork-only)
 
 - **idaes-ui on idaes-pse 2.13:**
   - `idaes_ui/fv/models/issues.py:145` and `:263` call names moved to `idaes.core.util.diagnostics_tools.utils.vars_with_extreme_values` and `idaes.core.util.model_statistics.variables_not_in_activated_constraints_set`.
