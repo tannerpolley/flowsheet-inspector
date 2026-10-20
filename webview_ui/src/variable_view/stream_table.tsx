@@ -164,9 +164,11 @@ function countMatches(
  * @returns the stream table view element
  */
 export default function StreamTable({ highlight }: { highlight?: string }) {
-    const { flowsheetRunnerResult } = useContext(AppContext);
+    const { flowsheetRunnerResult, highlightedStream } = useContext(AppContext);
     const actions = flowsheetRunnerResult?.actions;
     const flowsheetTable = actions?.stream_table;
+    // Stream picked in the process-flow view; +2 skips the label and units columns
+    const streamColumn = flowsheetTable && highlightedStream ? flowsheetTable.columns.indexOf(highlightedStream) : -1;
 
     // Unit reports from the last completed step, e.g. "solve_initial"
     const modelReports = actions?.model_reports;
@@ -249,7 +251,11 @@ export default function StreamTable({ highlight }: { highlight?: string }) {
                         className={css.table_section}
                     >
                         <h3 className={css.section_title}>Flowsheet Stream Table</h3>
-                        <Table {...flowsheetProps} highlight={highlight} />
+                        <Table
+                            {...flowsheetProps}
+                            highlight={highlight}
+                            highlightColumn={streamColumn >= 0 ? streamColumn + 2 : undefined}
+                        />
                     </section>
                 )}
 

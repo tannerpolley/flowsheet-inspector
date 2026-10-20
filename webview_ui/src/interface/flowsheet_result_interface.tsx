@@ -1,4 +1,5 @@
 import type { DeclaredVariable } from '../web_view/inputs';
+import type { FlowsheetGraph } from "../web_view/flowsheet_graph";
 
 // Variable value entry: [index, value, fixed?, stale?, lb?, ub?]
 // index can be null, string, number, or string[] (for multi-indexed like ["Liq","benzene"])
@@ -105,6 +106,7 @@ export interface FlowsheetActions {
     diagnostics?: Diagnostics;
     stream_table?: FlowsheetStreamTable;
     model_reports?: ModelReports;
+    flowsheet_graph?: FlowsheetGraph;
 }
 
 // ─── Diagnostics Types ───

@@ -156,6 +156,8 @@ UI to host (`frontendInstruction`, always with `fromPanel`: `treeView` or `webVi
 | `kill_process` | `pid` (from `process_started`) | `terminal_log` (stopped manually), a final `step_status_update` if any step was recorded, then `run_flowsheet_done`; no report |
 | `pull_flowsheet_history` | `id`: reportdb run id | `flowsheet_runner_result`, `step_status_update` (`reset: true`), or `error` |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | the same `switch_sub_tab` broadcast back |
+| `load_layout` | — | `layout` |
+| `save_layout` | `positions`: `{<unit name>: {x, y}}`, the whole saved map (replaces the stored one; `{}` resets) | none; the host stores it next to the flowsheet as `<flowsheet stem>.fi-layout.json` |
 | VS Code-only: `focus_view`, `focus_document` (`target`, `line`), `open_interpreter_picker`, `post_github_issue` (reply `github_issue_result`) | | |
 | `solve` | `values`: object mapping declared input keys (including `key[index]`) to finite numbers in the report's displayed units; `fromPanel: "webView"` | One transaction: `start_new_run`, `clear_terminal_logs`, `terminal_log`…, `step_status_update`…, `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done`; or `solve_rejected` before starting |
 | `cancel_solve` | `fromPanel`: `webView` or `treeView`; no process id | Cancel the active in-process run; restore values and send `solve_failed`, the restored `flowsheet_runner_result`, final `step_status_update`, `run_flowsheet_done` |
@@ -176,6 +178,7 @@ Host to UI (`type`):
 | `error` | `message` | Error log |
 | `history_update` | `data`: run list | History tab |
 | `switch_sub_tab` | `tab_name`, `sub_tab_name` | Result tab selection |
+| `layout` | `positions`: `{<unit name>: {x, y}}` (`{}` if none saved) | Process-flow diagram: saved units keep these positions, the rest get automatic layout |
 | VS Code-only: `python_env_update`, `update_open_files`, `flowsheet_file_saved`, `highlight_view`, `github_issue_result` | | |
 | `init` (live-solve additions) | `loadApp` also accepts `"standalone"`; optional `capabilities: {live_solve: bool}` | `standalone` renders run control and results together from one init; only `live_solve: true` enables editing fixed declared inputs. Absent/false stays read-only, including VS Code |
 | `solve_rejected` | `message`: explanation; `errors`: object mapping input keys to error text (may be empty for busy) | Reject unknown/non-editable keys, non-finite or out-of-bounds values, or a concurrent solve. Keep draft edits and show errors beside the fields; no model changes |

@@ -9,6 +9,7 @@ import { broadcastCurrentPythonEnv, isPythonExtensionInstalled } from './python_
 import { showFallbackInterpreterPicker } from './python_env_fallback';
 import { suppressNextTabSwitchFor } from './activate_tab_handler';
 import postGithubIssue, { IGithubIssueRequest } from './post_github_issue';
+import { readLayout, writeLayout } from './flowsheet_layout';
 
 export default function webviewReceiveMessageHandler(context: vscode.ExtensionContext, frontendMessage: IFrontendMessage) {
     console.log(`receive frontend instruction: ${JSON.stringify(frontendMessage)}`);
@@ -142,6 +143,25 @@ export default function webviewReceiveMessageHandler(context: vscode.ExtensionCo
                 }
             }
             break;
+        case 'load_layout':
+        case 'save_layout': {
+            // Process-flow positions are stored next to the active flowsheet file.
+            const flowsheetFile = context.globalState.get<string>('activatedFileName');
+            if (!flowsheetFile) {
+                webviewPanel.webview.postMessage({ type: 'error', message: 'No active flowsheet file to store the diagram layout with.' });
+                break;
+            }
+            try {
+                if (instruction === 'save_layout') {
+                    writeLayout(flowsheetFile, frontendMessage.positions ?? {});
+                } else {
+                    webviewPanel.webview.postMessage({ type: 'layout', positions: readLayout(flowsheetFile) });
+                }
+            } catch (e: any) {
+                webviewPanel.webview.postMessage({ type: 'error', message: `Diagram layout ${instruction} failed: ${e.message}` });
+            }
+            break;
+        }
         default:
             console.log(`receive unknown instruction: ${instruction}`);
     }

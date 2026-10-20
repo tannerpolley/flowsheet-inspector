@@ -38,20 +38,29 @@ function renderCellContent(cell: TableCellValue, highlight?: string): React.Reac
  * @param rows - table body rows; each row must have the same length as headers
  * @param highlight - optional search term; matches in header and body cells
  *                    are highlighted
+ * @param highlightColumn - optional column index to mark and scroll into view
  * @returns a horizontally scrollable table element
  */
-export default function Table({ headers, rows, highlight }: {
+export default function Table({ headers, rows, highlight, highlightColumn }: {
     headers: TableCellValue[];
     rows: TableCellValue[][];
     highlight?: string;
+    highlightColumn?: number;
 }) {
+    const columnClass = (i: number) => (i === highlightColumn ? css.column_highlight : undefined);
     return (
         <div className={css.table_wrapper}>
             <table className={css.data_table}>
                 <thead>
                     <tr>
                         {headers.map((header, i) => (
-                            <th key={i}>{renderCellContent(header, highlight)}</th>
+                            <th
+                                key={i}
+                                className={columnClass(i)}
+                                ref={i === highlightColumn ? (el) => el?.scrollIntoView({ block: 'center', inline: 'center' }) : undefined}
+                            >
+                                {renderCellContent(header, highlight)}
+                            </th>
                         ))}
                     </tr>
                 </thead>
@@ -59,7 +68,7 @@ export default function Table({ headers, rows, highlight }: {
                     {rows.map((row, rowIdx) => (
                         <tr key={rowIdx}>
                             {row.map((cell, cellIdx) => (
-                                <td key={cellIdx}>{renderCellContent(cell, highlight)}</td>
+                                <td key={cellIdx} className={columnClass(cellIdx)}>{renderCellContent(cell, highlight)}</td>
                             ))}
                         </tr>
                     ))}

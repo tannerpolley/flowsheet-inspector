@@ -44,3 +44,8 @@
     border-radius: 2px;
     padding: 0 1px;
 }
+
+/* Stream column picked in the process-flow view */
+.data_table .column_highlight {
+    background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
