@@ -53,35 +53,39 @@ function httpHost(pageUrl: string): Host {
             dispatch({ type: 'error', message: `Unreadable message from fi-serve: ${event.data}` });
         }
     };
-    // Requests wait for the stream to open, so no reply (e.g. `init` after
-    // `ready`) is broadcast before we are listening. They start in call order
-    // but run concurrently, so a long run never blocks a later kill_process.
-    const opened = new Promise<void>((resolve) => { events.onopen = () => resolve(); });
+    // CONNECTING means the browser is retrying on its own; CLOSED is final.
     events.onerror = () => {
-        // CONNECTING means the browser is retrying on its own; CLOSED is final.
         if (events.readyState === EventSource.CLOSED) {
             dispatch({ type: 'error', message: `Lost connection to fi-serve event stream (${eventsUrl.pathname})` });
         }
     };
 
-    const send = (message: HostMessage) => fetch(new URL('api/message', page), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-FI-Token': token },
-        body: JSON.stringify(message),
-    })
-        .then((response) => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        })
-        // Surface failures as the extension does: an error, and a rejected run
-        // ends so the Run button comes back.
-        .catch((error) => {
-            dispatch({ type: 'error', message: `Request to fi-serve failed: ${error}` });
-            if (message?.frontendInstruction === 'run_flowsheet') dispatch({ type: 'run_flowsheet_done' });
-        });
+    // Report a failed request as the extension does: an error, and a rejected
+    // run ends so the Run button comes back.
+    const fail = (message: HostMessage, reason: unknown) => {
+        dispatch({ type: 'error', message: `Request to fi-serve failed: ${reason}` });
+        if (message?.frontendInstruction === 'run_flowsheet') dispatch({ type: 'run_flowsheet_done' });
+    };
 
     return {
         postMessage(message) {
-            opened.then(() => send(message));
+            // Replies travel on the event stream; once it is closed for good
+            // nothing could answer, so fail locally instead of sending.
+            if (events.readyState === EventSource.CLOSED) {
+                fail(message, 'event stream closed');
+                return;
+            }
+            // A request sent while the stream reconnects needs no queue: fi-serve
+            // sends a state snapshot on every connection (design doc 5.2).
+            fetch(new URL('api/message', page), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-FI-Token': token },
+                body: JSON.stringify(message),
+            })
+                .then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                })
+                .catch((error) => fail(message, error));
         },
         onMessage(listener) {
             listeners.add(listener);

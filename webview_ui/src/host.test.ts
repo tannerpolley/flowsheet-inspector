@@ -23,7 +23,7 @@ test('uses the VS Code bridge when acquireVsCodeApi is injected', async () => {
 });
 
 test('uses HTTP plus server-sent events in a plain browser', async () => {
-    type FakeSource = { url: string; readyState: number; onopen?: () => void; onerror?: () => void;
+    type FakeSource = { url: string; readyState: number; onerror?: () => void;
         onmessage?: (event: { data: string }) => void };
     const sources: FakeSource[] = [];
     vi.stubGlobal('EventSource', class {
@@ -42,17 +42,13 @@ test('uses HTTP plus server-sent events in a plain browser', async () => {
     const [source] = sources;
     expect(source.url).toBe('http://127.0.0.1:8765/api/events?token=s3cret');
 
-    // Nothing is sent until the event stream is open, so the reply can't be missed.
     const message = { frontendInstruction: 'run_flowsheet', fromPanel: 'treeView', selectedSteps: 'solve' };
     host.postMessage(message);
-    await Promise.resolve();
-    expect(fetchMock).not.toHaveBeenCalled();
-    source.onopen!();
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(new URL('http://127.0.0.1:8765/api/message'), {
+    expect(fetchMock).toHaveBeenCalledWith(new URL('http://127.0.0.1:8765/api/message'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-FI-Token': 's3cret' },
         body: JSON.stringify(message),
-    }));
+    });
 
     source.onmessage!({ data: JSON.stringify({ type: 'run_flowsheet_done' }) });
     expect(received).toHaveBeenLastCalledWith({ type: 'run_flowsheet_done' });
@@ -75,4 +71,14 @@ test('uses HTTP plus server-sent events in a plain browser', async () => {
     source.readyState = 2;
     source.onerror!();
     expect(received).toHaveBeenCalledWith({ type: 'error', message: 'Lost connection to fi-serve event stream (/api/events)' });
+
+    // With the stream closed for good nothing could reply, so a run fails locally.
+    received.mockClear();
+    fetchMock.mockClear();
+    host.postMessage(message);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(received.mock.calls).toEqual([
+        [{ type: 'error', message: 'Request to fi-serve failed: event stream closed' }],
+        [{ type: 'run_flowsheet_done' }],
+    ]);
 });
