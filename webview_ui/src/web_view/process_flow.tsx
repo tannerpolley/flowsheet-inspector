@@ -17,10 +17,23 @@ import { toPng, toSvg } from 'html-to-image';
 import { AppContext } from '../context';
 import { host, type HostMessage } from '../host';
 import type { Diagnostics, FlowsheetStreamTable } from '../interface/flowsheet_result_interface';
-import { layoutFlowsheet, type ArcEdge, type FlowsheetGraph, type GraphArc, type Positions, type UnitNode } from './flowsheet_graph';
+import { layoutFlowsheet, streamColumn, type ArcEdge, type FlowsheetGraph, type GraphArc, type Positions, type UnitNode } from './flowsheet_graph';
 import css from '../css/process_flow.module.css';
 
 const EXPORT_PADDING = 40;
+
+// Every load_layout carries a new id that its `layout` reply echoes, so a
+// reply to an earlier request (an earlier report) is never applied.
+let lastLayoutRequest = 0;
+
+// One key per report: a new report remounts the view, so no diagram, saved
+// positions or pending layout reply carries over from the previous one.
+const reportKeys = new WeakMap<FlowsheetGraph, number>();
+let lastReportKey = 0;
+function reportKey(graph: FlowsheetGraph): number {
+    if (!reportKeys.has(graph)) reportKeys.set(graph, ++lastReportKey);
+    return reportKeys.get(graph)!;
+}
 
 function UnitNodeView({ data }: NodeProps<UnitNode>) {
     return (
@@ -47,7 +60,7 @@ function UnitNodeView({ data }: NodeProps<UnitNode>) {
 const nodeTypes = { unit: UnitNodeView };
 
 function StreamTooltip({ arc, table, x, y }: { arc: GraphArc; table?: FlowsheetStreamTable; x: number; y: number }) {
-    const column = table?.columns.indexOf(arc.name) ?? -1;
+    const column = table?.columns.indexOf(streamColumn(arc)) ?? -1;
     const rows = column < 0 || !table ? [] : table.index
         .map((label, i) => [label, table.data[i]?.[column]?.[0], table.units[i]] as const)
         .filter(([, value]) => value !== null && value !== undefined);
@@ -71,23 +84,32 @@ function StreamTooltip({ arc, table, x, y }: { arc: GraphArc; table?: FlowsheetS
 function Flow({ graph, streamTable, onShowStream }: {
     graph: FlowsheetGraph;
     streamTable?: FlowsheetStreamTable;
-    onShowStream: (arcName: string) => void;
+    onShowStream: (column: string) => void;
 }) {
     const [nodes, setNodes, onNodesChange] = useNodesState<UnitNode>([]);
     const [edges, setEdges] = useState<ArcEdge[]>([]);
+    const [error, setError] = useState<string>();
     const [saved, setSaved] = useState<Positions>({});
     const [hover, setHover] = useState<{ arc: GraphArc; x: number; y: number } | null>(null);
-    const { getNodes } = useReactFlow();
+    const { getNodes, fitView } = useReactFlow();
     const containerRef = useRef<HTMLDivElement>(null);
+    // The user moved or reset units; a late saved layout must not undo that.
+    const edited = useRef(false);
+    // The saved layout arrived after the first fitView, so fit again once it is drawn.
+    const fitAfterLayout = useRef(false);
+    const [fitRequest, setFitRequest] = useState(0);
 
-    useEffect(() => host.onMessage((message: HostMessage) => {
-        if (message.type === 'layout') setSaved(message.positions ?? {});
-    }), []);
-
-    // Saved positions belong to the flowsheet file, so ask again for each new report.
+    // Ask once for this report's saved positions (the view remounts per report).
     useEffect(() => {
-        host.postMessage({ frontendInstruction: 'load_layout', fromPanel: 'webView' });
-    }, [graph]);
+        const request = ++lastLayoutRequest;
+        const unsubscribe = host.onMessage((message: HostMessage) => {
+            if (message.type !== 'layout' || message.request !== request || edited.current) return;
+            fitAfterLayout.current = true;
+            setSaved(message.positions ?? {});
+        });
+        host.postMessage({ frontendInstruction: 'load_layout', fromPanel: 'webView', request });
+        return unsubscribe;
+    }, []);
 
     useEffect(() => {
         let current = true;
@@ -95,11 +117,22 @@ function Flow({ graph, streamTable, onShowStream }: {
             if (!current) return;
             setNodes(result.nodes);
             setEdges(result.edges);
+            setError(result.error);
+            if (fitAfterLayout.current) {
+                fitAfterLayout.current = false;
+                setFitRequest((n) => n + 1);
+            }
         });
         return () => { current = false; };
-    }, [graph, saved]);
+    }, [graph, saved, setNodes]);
+
+    // Fit after the new positions reach React Flow; fitView measures its current nodes.
+    useEffect(() => {
+        if (fitRequest) fitView();
+    }, [fitRequest, fitView]);
 
     function saveLayout(positions: Positions) {
+        edited.current = true;
         setSaved(positions);
         host.postMessage({ frontendInstruction: 'save_layout', fromPanel: 'webView', positions });
     }
@@ -124,6 +157,15 @@ function Flow({ graph, streamTable, onShowStream }: {
         link.click();
     }
 
+    if (error) {
+        return (
+            <EmptyState error title="Process Flow Layout Failed">
+                <p className={css.error_body}>The automatic layout could not place this flowsheet graph: {error}</p>
+                <p>The Diagram tab still works.</p>
+            </EmptyState>
+        );
+    }
+
     return (
         <>
             <div className={css.toolbar}>
@@ -141,13 +183,17 @@ function Flow({ graph, streamTable, onShowStream }: {
                     edges={edges}
                     nodeTypes={nodeTypes}
                     onNodesChange={onNodesChange}
+                    onNodeDragStart={() => { edited.current = true; }}
                     onNodeDragStop={(_event, _node, dragged) => saveLayout({
                         ...saved,
                         ...Object.fromEntries(dragged.map((node) => [node.id, node.position])),
                     })}
                     onEdgeMouseEnter={(event, edge) => setHover({ arc: (edge as ArcEdge).data!.arc, x: event.clientX, y: event.clientY })}
                     onEdgeMouseLeave={() => setHover(null)}
-                    onEdgeClick={(_event, edge) => streamTable?.columns.includes(edge.id) && onShowStream(edge.id)}
+                    onEdgeClick={(_event, edge) => {
+                        const column = streamColumn((edge as ArcEdge).data!.arc);
+                        if (streamTable?.columns.includes(column)) onShowStream(column);
+                    }}
                     nodesConnectable={false}
                     colorMode={document.body.classList.contains('vscode-light') ? 'light' : document.body.classList.contains('vscode-dark') ? 'dark' : 'system'}
                     fitView
@@ -177,7 +223,7 @@ function EmptyState({ title, children, error }: { title: string; children: React
 }
 
 /** Interactive process-flow view of actions.flowsheet_graph. */
-export default function ProcessFlow({ onShowStream }: { onShowStream: (arcName: string) => void }) {
+export default function ProcessFlow({ onShowStream }: { onShowStream: (column: string) => void }) {
     const { flowsheetRunnerResult } = useContext(AppContext);
     const graph = flowsheetRunnerResult?.actions?.flowsheet_graph;
     const diagnostics = flowsheetRunnerResult?.actions?.diagnostics as Diagnostics | undefined;
@@ -214,7 +260,7 @@ export default function ProcessFlow({ onShowStream }: { onShowStream: (arcName: 
         body = <EmptyState title="No Units Found"><p>The flowsheet graph has no unit models.</p></EmptyState>;
     } else {
         body = (
-            <ReactFlowProvider>
+            <ReactFlowProvider key={reportKey(graph)}>
                 <Flow graph={graph} streamTable={flowsheetRunnerResult.actions.stream_table} onShowStream={onShowStream} />
             </ReactFlowProvider>
         );

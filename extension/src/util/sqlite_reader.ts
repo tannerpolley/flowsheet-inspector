@@ -9,6 +9,7 @@
  */
 import { Database } from 'node-sqlite3-wasm';
 import * as fs from 'fs';
+import * as path from 'path';
 import { getIdaesDbPath } from './platform_config';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -160,17 +161,18 @@ export function queryReportById(id: number): unknown {
  * whatever file happens to be active in the editor.
  *
  * @param id  The primary-key ID of the reports row to fetch.
- * @returns   The stored flowsheet file path, or '' if the DB/row is absent.
+ * @returns   The stored flowsheet file path (`filedir` joined with `filename`),
+ *            or '' if the DB/row is absent.
  */
-export function queryReportFilenameById(id: number): string {
+export function queryReportFilePathById(id: number): string {
     const dbPath = getIdaesDbPath();
     if (!fs.existsSync(dbPath)) {
         return '';
     }
     const db = new Database(dbPath, { readOnly: true });
     try {
-        const row = db.get('SELECT filename FROM reports WHERE id = ?', id) as { filename: unknown } | null;
-        return row ? toStr(row.filename) : '';
+        const row = db.get('SELECT filedir, filename FROM reports WHERE id = ?', id) as { filedir: unknown; filename: unknown } | null;
+        return row ? path.join(toStr(row.filedir), toStr(row.filename)) : '';
     } catch {
         // reports table may not exist yet on a brand-new DB.
         return '';

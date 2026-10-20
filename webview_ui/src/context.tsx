@@ -78,8 +78,8 @@ interface AppContextType {
     // were produced; drives the "rerun the flowsheet" notice under Run.
     flowsheetSaveNotice: boolean;
     setFlowsheetSaveNotice: React.Dispatch<React.SetStateAction<boolean>>;
-    // Arc name of the stream picked in the process-flow view; the stream
-    // table highlights its column.
+    // Stream-table column of the stream picked in the process-flow view;
+    // the stream table highlights it.
     highlightedStream: string | null;
     setHighlightedStream: React.Dispatch<React.SetStateAction<string | null>>;
 }

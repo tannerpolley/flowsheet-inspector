@@ -1,5 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Position } from '@xyflow/react';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { layoutFlowsheet, type FlowsheetGraph, type GraphArc, type GraphUnit } from './flowsheet_graph';
 
 const port = (name: string, direction: 'in' | 'out' | 'bidirectional' | 'unknown') => ({ name, direction });
@@ -61,9 +62,13 @@ test('ports sit on the side their direction asks for', async () => {
     expect(ports.purge.y).toBeCloseTo(node.height!);
 });
 
-test('saved positions override the layout for those units only', async () => {
+test('saved positions override the layout for those units only, and non-finite ones are ignored', async () => {
     const auto = await layoutFlowsheet(contactors);
-    const saved = await layoutFlowsheet(contactors, { 'fs.section.second': { x: -500, y: 900 } });
+    const saved = await layoutFlowsheet(contactors, {
+        'fs.section.second': { x: -500, y: 900 },
+        // A hand-edited layout file.
+        'fs.section.third': { x: 'broken', y: null } as unknown as { x: number; y: number },
+    });
     const position = (result: typeof auto, id: string) => result.nodes.find((node) => node.id === id)!.position;
 
     expect(position(saved, 'fs.section.second')).toEqual({ x: -500, y: 900 });
@@ -71,22 +76,35 @@ test('saved positions override the layout for those units only', async () => {
     expect(position(saved, 'fs.section.third')).toEqual(position(auto, 'fs.section.third'));
 });
 
-test('drops arcs to missing units or ports and hides unconnected units inside units', async () => {
+test('drops arcs to missing units or ports', async () => {
     const graph: FlowsheetGraph = {
-        units: [
-            contactors.units[0],
-            contactors.units[1],
-            // A flash's internal splitter: nested in a unit and never connected.
-            { name: 'fs.section.first.split', class_name: '_ScalarSeparator', parent_block: 'fs.section.first', ports: [port('inlet', 'in')] },
-        ],
+        units: [contactors.units[0], contactors.units[1]],
         arcs: [
             contactors.arcs[0],
             arc('fs.section.gone', 'fs.section.first', 'organic_outlet', 'fs.section.missing', 'inlet'),
             arc('fs.section.bad_port', 'fs.section.first', 'no_such_port', 'fs.section.second', 'organic_inlet'),
         ],
     };
-    const { nodes, edges } = await layoutFlowsheet(graph);
+    const { edges } = await layoutFlowsheet(graph);
 
-    expect(nodes.map((node) => node.id)).toEqual(['fs.section.first', 'fs.section.second']);
     expect(edges.map((edge) => edge.id)).toEqual(['fs.section.aq1']);
+});
+
+test('units nested in units are drawn, even without arcs, unless the lib marks them internal', async () => {
+    const nested = (name: string): GraphUnit => ({
+        name: `fs.section.first.${name}`, class_name: '_ScalarSeparator', parent_block: 'fs.section.first', ports: [port('inlet', 'in')],
+    });
+    const graph: FlowsheetGraph = {
+        units: [contactors.units[0], nested('mixer'), { ...nested('split'), internal: true }],
+        arcs: [],
+    };
+    const { nodes } = await layoutFlowsheet(graph);
+
+    expect(nodes.map((node) => node.id)).toEqual(['fs.section.first', 'fs.section.first.mixer']);
+});
+
+test('an ELK failure gives an error and no diagram', async () => {
+    vi.spyOn(ELK.prototype, 'layout').mockRejectedValueOnce(new Error('ELK exploded'));
+
+    expect(await layoutFlowsheet(contactors)).toEqual({ nodes: [], edges: [], error: 'ELK exploded' });
 });

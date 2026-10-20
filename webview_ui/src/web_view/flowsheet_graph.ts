@@ -17,10 +17,12 @@ export interface GraphUnit {
     class_name: string;
     parent_block: string;
     ports: GraphPort[];
+    internal?: boolean; // an implementation sub-unit (e.g. a flash's splitter); not drawn
 }
 
 export interface GraphArc {
-    name: string; // also the arc's column name in actions.stream_table
+    name: string;
+    stream_column?: string; // the arc's actions.stream_table column key, when it differs from name
     source_unit: string;
     source_port: string;
     dest_unit: string;
@@ -37,6 +39,9 @@ export interface FlowsheetGraph {
 
 export type Positions = Record<string, { x: number; y: number }>;
 
+/** The arc's column key in actions.stream_table, for hover values and click-highlight. */
+export const streamColumn = (arc: GraphArc) => arc.stream_column ?? arc.name;
+
 export interface PortView {
     name: string;
     side: Position;
@@ -47,6 +52,11 @@ export interface PortView {
 
 export type UnitNode = Node<{ label: string; className: string; ports: PortView[] }, 'unit'>;
 export type ArcEdge = Edge<{ arc: GraphArc }>;
+export interface Diagram {
+    nodes: UnitNode[];
+    edges: ArcEdge[];
+    error?: string; // ELK could not lay the graph out; nodes and edges are empty
+}
 
 // Inlets on the left, outlets on the right, everything else top or bottom.
 const SIDES: Record<GraphPort['direction'], Position> = {
@@ -67,6 +77,9 @@ const CHAR_WIDTH = 6.5; // rough width of one label character
 
 const elk = new ELK();
 
+// Saved positions come from a file the user can edit.
+const isFinitePosition = (p?: { x: unknown; y: unknown }) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
 /** Drop leading block names every unit shares ("fs.") to get short labels. */
 function sharedPrefix(units: GraphUnit[]): string {
     const paths = units.map((unit) => unit.parent_block.split('.'));
@@ -79,21 +92,22 @@ function sharedPrefix(units: GraphUnit[]): string {
 
 /**
  * Lays out the flowsheet graph with ELK and returns React Flow nodes and
- * edges. Units in `saved` keep their saved position; the rest get ELK's.
+ * edges. Units in `saved` with a finite position keep it; the rest get ELK's.
+ * Never rejects: a failed layout gives `error` and no nodes or edges.
  *
- * Units nested inside another unit (e.g. a flash's internal splitter) are
- * hidden unless an arc touches them. Arcs whose unit or port is missing from
- * the report are dropped.
+ * Every unit is drawn except those the lib marks `internal`. Arcs whose unit
+ * or port is missing from the report are dropped.
  */
-export async function layoutFlowsheet(
-    graph: FlowsheetGraph,
-    saved: Positions = {},
-): Promise<{ nodes: UnitNode[]; edges: ArcEdge[] }> {
-    const unitNames = new Set(graph.units.map((unit) => unit.name));
-    const connected = new Set(graph.arcs.flatMap((arc) => [arc.source_unit, arc.dest_unit]));
-    const units = graph.units.filter(
-        (unit) => !unitNames.has(unit.parent_block) || connected.has(unit.name),
-    );
+export async function layoutFlowsheet(graph: FlowsheetGraph, saved: Positions = {}): Promise<Diagram> {
+    try {
+        return await layoutGraph(graph, saved);
+    } catch (error) {
+        return { nodes: [], edges: [], error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+async function layoutGraph(graph: FlowsheetGraph, saved: Positions): Promise<Diagram> {
+    const units = graph.units.filter((unit) => !unit.internal);
     const portIds = new Set(units.flatMap((unit) => unit.ports.map((port) => `${unit.name}/${port.name}`)));
     const arcs = graph.arcs.filter(
         (arc) => portIds.has(`${arc.source_unit}/${arc.source_port}`) && portIds.has(`${arc.dest_unit}/${arc.dest_port}`),
@@ -107,8 +121,9 @@ export async function layoutFlowsheet(
             'elk.direction': 'RIGHT',
             'elk.spacing.nodeNode': '40',
             'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-            // Walk from the first unit in model order, so recycles (not the
-            // main flow) are the arcs drawn backwards.
+            // Cycle breaking follows model order: ELK walks depth-first from the
+            // units as listed and draws the arc that closes each cycle backwards,
+            // which is not necessarily the recycle.
             'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
         },
         children: units.map((unit) => {
@@ -152,7 +167,7 @@ export async function layoutFlowsheet(
         return {
             id: unit.name,
             type: 'unit',
-            position: saved[unit.name] ?? { x: child.x ?? 0, y: child.y ?? 0 },
+            position: isFinitePosition(saved[unit.name]) ? saved[unit.name] : { x: child.x ?? 0, y: child.y ?? 0 },
             width: child.width,
             height: child.height,
             data: {

@@ -51,8 +51,8 @@ export default function WebView() {
         case 'process_flow':
             display = (
                 <Suspense fallback={<p>Loading process flow…</p>}>
-                    <ProcessFlow onShowStream={(arcName) => {
-                        setHighlightedStream(arcName);
+                    <ProcessFlow onShowStream={(column) => {
+                        setHighlightedStream(column);
                         setActiveTab('variable');
                     }} />
                 </Suspense>

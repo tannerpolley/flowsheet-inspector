@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import css from '../css/table.module.css'
 
 /** A single cell value; null renders as "-" */
@@ -48,6 +49,12 @@ export default function Table({ headers, rows, highlight, highlightColumn }: {
     highlightColumn?: number;
 }) {
     const columnClass = (i: number) => (i === highlightColumn ? css.column_highlight : undefined);
+    // Scroll to the marked column when it is first shown or changes, not on
+    // every render (typing in search re-renders the table).
+    const highlightRef = useRef<HTMLTableCellElement>(null);
+    useEffect(() => {
+        highlightRef.current?.scrollIntoView({ block: 'center', inline: 'center' });
+    }, [highlightColumn]);
     return (
         <div className={css.table_wrapper}>
             <table className={css.data_table}>
@@ -57,7 +64,7 @@ export default function Table({ headers, rows, highlight, highlightColumn }: {
                             <th
                                 key={i}
                                 className={columnClass(i)}
-                                ref={i === highlightColumn ? (el) => el?.scrollIntoView({ block: 'center', inline: 'center' }) : undefined}
+                                ref={i === highlightColumn ? highlightRef : undefined}
                             >
                                 {renderCellContent(header, highlight)}
                             </th>
