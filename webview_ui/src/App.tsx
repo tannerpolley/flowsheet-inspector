@@ -9,9 +9,12 @@ import EditorPage from './editor_page';
 import WebView from './web_view/main_display.tsx';
 import './webviewApp.css'
 import appCss from './css/app.module.css'
+import { supportsLiveSolve } from './web_view/inputs';
 
 export default function App() {
   const {
+    setLiveSolveEnabled,
+    setIsRunningFlowsheet,
     setidaesRunInfo, // the idaes-run --info result
     setEditorContent, // the activate editor content
     setActivateFileName, // the current activate file name
@@ -61,6 +64,12 @@ export default function App() {
         console.log('loading tree page');
         loadedApp = <TreePage />
         break;
+      case 'standalone':
+        loadedApp = <div className={appCss.standalone}>
+          <aside aria-label="Run control"><TreePage /></aside>
+          <main aria-label="Results"><WebView /></main>
+        </div>;
+        break;
       case 'error':
         console.log(`Encounter an error: ${pageName}`);
         break;
@@ -89,10 +98,13 @@ export default function App() {
   }, [flowsheetRunnerResult]);
 
   useEffect(() => {
+    let liveSolve = false;
     // listen extension message
-    host.onMessage((message) => {
+    const unsubscribe = host.onMessage((message) => {
       switch (message.type) {
         case 'init':
+          liveSolve = supportsLiveSolve(message.capabilities);
+          setLiveSolveEnabled(liveSolve);
           console.log(`VSCode post message: ${JSON.stringify(message)}`);
           setEditorContent(message.content);
           setActivateFileName(message.fileName);
@@ -176,14 +188,18 @@ export default function App() {
           setTerminalLogs((prev: string[]) => [...prev, message.data]);
           break;
         case 'start_new_run':
-          // Clear previous run results so stale diagram/IPOPT/diagnostic data doesn't linger during a new run
-          setFlowsheetRunnerResult(null);
+          // Live solve keeps the last report until the replacement (or rollback) arrives.
+          if (liveSolve) setIsRunningFlowsheet(true);
+          else setFlowsheetRunnerResult(null);
           setMermaidDiagram('');
           setExtensionErrorLogs([]);
           // Reset per-step run indicators so the tree view starts from a clean slate
           setStepStatuses({});
           // The new run picks up the saved edits, so the rerun notice is satisfied
           setFlowsheetSaveNotice(false);
+          break;
+        case 'run_flowsheet_done':
+          if (liveSolve) setIsRunningFlowsheet(false);
           break;
         case 'flowsheet_file_saved':
           // The active flowsheet file was saved after the shown results were
@@ -276,6 +292,7 @@ export default function App() {
 
     // tell extension React is ready, can send data
     host.postMessage({ frontendInstruction: 'ready', fromPanel: 'treeView' });
+    return unsubscribe;
   }, []);
 
   return (

@@ -18,3 +18,25 @@
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
 }
+
+.standalone {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    height: 100%;
+    color-scheme: dark;
+    --vscode-editor-background: #1e1e1e;
+    --vscode-editor-foreground: #e6e6e6;
+    --vscode-foreground: #e6e6e6;
+    --vscode-sideBar-background: #252526;
+    --vscode-descriptionForeground: #b8b8b8;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+}
+.standalone > aside { border-right: 1px solid #555; overflow: auto; }
+.standalone > main { min-width: 0; }
+/* Existing pages fill a webview; constrain them to their standalone columns. */
+.standalone > aside > div, .standalone > main > div { width: 100%; }
+.standalone > main ul { flex-wrap: wrap; }
+@media (max-width: 700px) {
+    .standalone { grid-template-columns: 220px minmax(0, 1fr); }
+}

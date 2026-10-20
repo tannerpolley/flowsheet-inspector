@@ -1,0 +1,18 @@
+.panel { padding-bottom: 24px; }
+.panel h2, .panel h3, .panel h4, .panel p { margin-bottom: 12px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.panel button { color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #075d94); }
+.panel button:disabled { opacity: 0.5; }
+.group { margin: 16px 0 24px; }
+.tableScroll { overflow-x: auto; }
+.panel table { border-collapse: collapse; width: 100%; text-align: left; }
+.panel th, .panel td { padding: 10px; border-bottom: 1px solid var(--vscode-panel-border, #555); vertical-align: top; }
+.panel tbody th { font-weight: normal; }
+.panel small { display: block; font-size: 12px; margin-top: 4px; }
+.panel input { width: 160px; max-width: 100%; padding: 6px; color: var(--vscode-input-foreground, #eee); background: var(--vscode-input-background, #292929); border: 1px solid var(--vscode-input-border, #777); border-radius: 3px; }
+.panel input[aria-invalid=true] { border-color: var(--vscode-errorForeground, #ff8080); }
+.error { color: var(--vscode-errorForeground, #ff8080); }
+.pending { color: var(--vscode-editorWarning-foreground, #e6c164); }
+.warning { border-left: 3px solid var(--vscode-editorWarning-foreground, #e6c164); padding: 12px; margin-bottom: 12px; }
+.warning button { margin-right: 12px; }
+.progress { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow: auto; }

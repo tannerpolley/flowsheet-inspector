@@ -4,6 +4,7 @@ import { AppContext } from "../context";
 import css from "../css/run_flowsheet.module.css";
 export default function RunFlowsheet() {
     const {
+        liveSolveEnabled,
         isLoading,
         isRunningFlowsheet,
         setIsRunningFlowsheet,
@@ -29,7 +30,7 @@ export default function RunFlowsheet() {
      * Also this will set isRunningFlowsheet to true, this will start the loading animation.   
      */
     const runFlowsheetHandler = () => {
-        if (isLoading) return;
+        if (isLoading || isRunningFlowsheet) return;
         const lastSelectedStep = selectedSteps.length > 0
             ? selectedSteps[selectedSteps.length - 1]
             : "";
@@ -49,6 +50,10 @@ export default function RunFlowsheet() {
     }
 
     const cancelFlowsheetRunHandler = () => {
+        if (liveSolveEnabled) {
+            host.postMessage({ frontendInstruction: 'cancel_solve', fromPanel: 'treeView' });
+            return;
+        }
         console.log(`cancelFlowsheetRunHandler triggered, activePid is: ${activePid}`);
         host.postMessage(
             {

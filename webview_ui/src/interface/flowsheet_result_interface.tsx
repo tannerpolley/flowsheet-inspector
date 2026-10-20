@@ -1,3 +1,5 @@
+import type { DeclaredVariable } from '../web_view/inputs';
+
 // Variable value entry: [index, value, fixed?, stale?, lb?, ub?]
 // index can be null, string, number, or string[] (for multi-indexed like ["Liq","benzene"])
 // Short form: [index, value]  or  Full form: [index, value, fixed, stale, lb, ub]
@@ -93,6 +95,7 @@ export interface ModelReports {
 
 // Actions collected from the flowsheet run
 export interface FlowsheetActions {
+    inputs?: { variables: DeclaredVariable[] };
     degrees_of_freedom?: DegreesOfFreedom;
     timings?: FlowsheetTimings;
     capture_solver_output?: SolverOutput;
